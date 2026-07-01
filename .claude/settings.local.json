@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git init *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git remote *)",
+      "Bash(git push *)",
+      "Bash(gh repo *)",
+      "Bash(git rm *)",
+      "Bash(git checkout *)",
+      "Bash(git filter-branch *)",
+      "Read(//c/Users/waterllama working/**)",
+      "Bash(rm -rf waterllama-react/.git)"
+    ]
+  }
+}

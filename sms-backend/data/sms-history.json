@@ -1,0 +1,272 @@
+[
+  {
+    "id": 27,
+    "message": "Hi User, time to drink water. You have completed 31% of your 2.5 L hydration goal today.",
+    "sent": 1,
+    "delivered": 1,
+    "failed": 0,
+    "timestamp": "2026-06-28T12:46:03.516Z"
+  },
+  {
+    "id": 26,
+    "message": "Hi User, time to drink water. You have completed 31% of your 2.5 L hydration goal today.",
+    "sent": 1,
+    "delivered": 1,
+    "failed": 0,
+    "timestamp": "2026-06-28T12:43:41.999Z"
+  },
+  {
+    "id": 25,
+    "message": "Hi User, time to drink water. You have completed 31% of your 2.5 L hydration goal today.",
+    "sent": 1,
+    "delivered": 1,
+    "failed": 0,
+    "timestamp": "2026-06-28T12:36:57.309Z"
+  },
+  {
+    "id": 24,
+    "message": "Hey {name}! Get 50% off Aqualama Premium this weekend only. Go to the Premium tab now!",
+    "sent": 1,
+    "delivered": 1,
+    "failed": 0,
+    "timestamp": "2026-06-28T12:34:43.897Z"
+  },
+  {
+    "id": 23,
+    "message": "😀😃!@#$%^&*()_+~`",
+    "sent": 1,
+    "delivered": 1,
+    "failed": 0,
+    "timestamp": "2026-06-28T12:32:36.196Z"
+  },
+  {
+    "id": 22,
+    "message": "Hi {name}, hope you are staying hydrated today! Log your water intake in Aqualama.\nHi {name}, hope you are staying hydrated today! Log your water intake in Aqualama.\nHi {name}, hope you are staying hydrated today! Log your water intake in Aqualama.\nHi {name}, hope you are staying hydrated today! Log your water intake in Aqualama.",
+    "sent": 1,
+    "delivered": 1,
+    "failed": 0,
+    "timestamp": "2026-06-28T12:29:21.969Z"
+  },
+  {
+    "id": 21,
+    "message": "Hi {name}, hope you are staying hydrated today! Log your water intake in Aqualama.Hi {name}, hope you are staying hydrated today! Log your water intake in Aqualama.Hi {name}, hope you are staying hydrated today! Log your water intake in Aqualama.Hi {name}, hope you are staying hydrated today! Log your water intake in Aqualama.Hi {name}, hope you are staying hydrated today! Log your water intake in Aqualama.Hi {name}, hope you are staying hydrated today! Log your water intake in Aqualama.Hi {name}, hope you are staying hydrated today! Log your water intake in Aqualama.",
+    "sent": 1,
+    "delivered": 1,
+    "failed": 0,
+    "timestamp": "2026-06-28T12:27:48.513Z"
+  },
+  {
+    "id": 20,
+    "message": "Hi {name}, hope you are staying hydrated today! Log your water intake in Aqualama.\nHi {name}, hope you are staying hydrated today! Log your water intake in Aqualama.\nHi {name}, hope you are staying hydrated today! Log your water intake in Aqualama.\nHi {name}, hope you are staying hydrated today! Log your water intake in Aqualama.",
+    "sent": 1,
+    "delivered": 1,
+    "failed": 0,
+    "timestamp": "2026-06-28T12:24:30.426Z"
+  },
+  {
+    "id": 19,
+    "message": "Hi {name}, hope you are staying hydrated today! Log your water intake in Aqualama.\nHi {name}, hope you are staying hydrated today! Log your water intake in Aqualama.\nHi {name}, hope you are staying hydrated today! Log your water intake in Aqualama.\nHi {name}, hope you are staying hydrated today! Log your water intake in Aqualama.\nHi {name}, hope you are staying hydrated today! Log your water intake in Aqualama.",
+    "sent": 1,
+    "delivered": 1,
+    "failed": 0,
+    "timestamp": "2026-06-28T12:22:39.245Z"
+  },
+  {
+    "id": 18,
+    "message": "Hi {name}, hope you are staying hydrated today! Log your water intake in Aqualama.\nHi {name}, hope you are staying hydrated today! Log your water intake in Aqualama.\nHi {name}, hope you are staying hydrated today! Log your water intake in Aqualama.",
+    "sent": 1,
+    "delivered": 1,
+    "failed": 0,
+    "timestamp": "2026-06-28T12:21:44.394Z"
+  },
+  {
+    "id": 17,
+    "message": "Hi {name}, hope you are staying hydrated today! Log your water intake in Aqualama.\nHi {name}, hope you are staying hydrated today! Log your water intake in Aqualama.",
+    "sent": 1,
+    "delivered": 1,
+    "failed": 0,
+    "timestamp": "2026-06-28T12:21:05.705Z"
+  },
+  {
+    "id": 16,
+    "message": "Hi {name}, hope you are staying hydrated today! Log your water intake in Aqualama.\nHi {name}, hope you are staying hydrated today! Log your water intake in Aqualama.\nHi {name}, hope you are staying hydrated today! Log your water intake in Aqualama.\nHi {name}, hope you are staying hydrated today! Log your water intake in Aqualama.\nHi {name}, hope you are staying hydrated today! Log your water intake in Aqualama.\nHi {name}, hope you are staying hydrated today! Log your water intake in Aqualama.\nHi {name}, hope you are staying hydrated today! Log your water intake in Aqualama.\nHi {name}, hope you are staying hydrated today! Log your water intake in Aqualama.\nHi {name}, hope you are staying hydrated today! Log your water intake in Aqualama.",
+    "sent": 1,
+    "delivered": 1,
+    "failed": 0,
+    "timestamp": "2026-06-28T12:18:34.317Z"
+  },
+  {
+    "id": 15,
+    "message": "Hi User, time to drink water. You have completed 31% of your 2.5 L hydration goal today.",
+    "sent": 1,
+    "delivered": 1,
+    "failed": 0,
+    "timestamp": "2026-06-28T06:29:13.901Z"
+  },
+  {
+    "id": 14,
+    "message": "Hi {name}, thank you for being a valued customer! Use code SAVE20 for 20% off your next order. Reply STOP to unsubscribe.",
+    "sent": 1,
+    "delivered": 1,
+    "failed": 0,
+    "timestamp": "2026-06-28T06:15:55.319Z"
+  },
+  {
+    "id": 13,
+    "message": "Stay strong {name}! You are close to hitting your daily water target today. Keep tracking!",
+    "sent": 1,
+    "delivered": 1,
+    "failed": 0,
+    "timestamp": "2026-06-28T06:15:00.595Z"
+  },
+  {
+    "id": 12,
+    "message": "Hi User, time to drink water. You have completed 31% of your 2.5 L hydration goal today.",
+    "sent": 1,
+    "delivered": 1,
+    "failed": 0,
+    "timestamp": "2026-06-28T06:14:34.466Z"
+  },
+  {
+    "id": 11,
+    "message": "Hi User, time to drink water. You have completed 31% of your 2.5 L hydration goal today.",
+    "sent": 1,
+    "delivered": 0,
+    "failed": 1,
+    "timestamp": "2026-06-28T05:43:35.853Z"
+  },
+  {
+    "id": 10,
+    "message": "Hi User, time to drink water. You have completed 31% of your 2.5 L hydration goal today.",
+    "sent": 1,
+    "delivered": 0,
+    "failed": 1,
+    "timestamp": "2026-06-28T05:41:56.653Z"
+  },
+  {
+    "id": 9,
+    "message": "Hi User, time to drink water. You have completed 31% of your 2.5 L hydration goal today.",
+    "sent": 1,
+    "delivered": 0,
+    "failed": 1,
+    "timestamp": "2026-06-28T05:40:46.995Z"
+  },
+  {
+    "id": 8,
+    "message": "Hey {name}! Get 50% off Aqualama Premium this weekend only. Go to the Premium tab now!",
+    "sent": 1,
+    "delivered": 0,
+    "failed": 1,
+    "timestamp": "2026-06-28T05:29:16.201Z"
+  },
+  {
+    "id": 7,
+    "message": "Hi User, time to drink water. You have completed 31% of your 2.5 L hydration goal today.",
+    "sent": 1,
+    "delivered": 0,
+    "failed": 1,
+    "timestamp": "2026-06-28T05:20:40.264Z"
+  },
+  {
+    "id": 6,
+    "message": "Hi User, time to drink water. You have completed 31% of your 2.5 L hydration goal today.",
+    "sent": 1,
+    "delivered": 0,
+    "failed": 1,
+    "timestamp": "2026-06-28T05:20:17.917Z"
+  },
+  {
+    "id": 5,
+    "message": "Hi User, time to drink water. You have completed 31% of your 2.5 L hydration goal today.",
+    "sent": 1,
+    "delivered": 0,
+    "failed": 1,
+    "timestamp": "2026-06-28T05:20:12.830Z"
+  },
+  {
+    "id": 4,
+    "message": "Hi User, time to drink water. You have completed 31% of your 2.5 L hydration goal today.",
+    "sent": 1,
+    "delivered": 0,
+    "failed": 1,
+    "timestamp": "2026-06-28T05:20:11.531Z"
+  },
+  {
+    "id": 3,
+    "message": "Hi User, time to drink water. You have completed 31% of your 2.5 L hydration goal today.",
+    "sent": 1,
+    "delivered": 1,
+    "failed": 0,
+    "timestamp": "2026-06-27T15:14:08.548Z"
+  },
+  {
+    "id": 2,
+    "message": "Hi User, time to drink water. You have completed 31% of your 2.5 L hydration goal today.",
+    "sent": 1,
+    "delivered": 1,
+    "failed": 0,
+    "timestamp": "2026-06-27T13:51:22.138Z"
+  },
+  {
+    "id": 1,
+    "message": "Hey Nikhil! Get 50% off Aqualama Premium this weekend only. Go to the Premium tab now!",
+    "sent": 1,
+    "delivered": 1,
+    "failed": 0,
+    "timestamp": "2026-06-27T13:45:51.114Z"
+  },
+  {
+    "id": 1782540690101,
+    "createdAt": "2026-06-27T06:11:29.695Z",
+    "senderName": "Aqualama",
+    "message": "Hi, Nikhil your water time is over please check the details",
+    "recipients": [
+      "+918956455702"
+    ],
+    "sent": 1,
+    "failed": 0,
+    "results": [
+      {
+        "phone": "+918956455702",
+        "success": true,
+        "sid": "SM1b2af3c963e13b454831ba2ee91c7c42"
+      }
+    ]
+  },
+  {
+    "id": 1780506678509,
+    "createdAt": "2026-06-03T17:11:17.758Z",
+    "senderName": "MyCompany",
+    "message": "Hi {name}, thank you for being a valued customer! Use code SAVE20 for 20% off your next order. Reply STOP to unsubscribe.",
+    "recipients": [
+      "+918956455702"
+    ],
+    "sent": 1,
+    "failed": 0,
+    "results": [
+      {
+        "phone": "+918956455702",
+        "success": true,
+        "sid": "SMa731c12afb40a3ec13cb99965fb6bccc"
+      }
+    ]
+  },
+  {
+    "id": 1780506646451,
+    "createdAt": "2026-06-03T17:10:46.018Z",
+    "senderName": "MyCompany",
+    "message": "Hi {name}, thank you for being a valued customer! Use code SAVE20 for 20% off your next order. Reply STOP to unsubscribe.",
+    "recipients": [
+      "+918956455702"
+    ],
+    "sent": 1,
+    "failed": 0,
+    "results": [
+      {
+        "phone": "+918956455702",
+        "success": true,
+        "sid": "SM8f9627379a9b3592b3ed2784dd809366"
+      }
+    ]
+  }
+]

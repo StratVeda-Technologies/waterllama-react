@@ -1,0 +1,1129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BlastSMS — Bulk Message Platform</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0a0b0f;--surface:#111217;--surface2:#191b22;--surface3:#21242e;--border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.12);--accent:#00e5a0;--accent2:#00c487;--accent-dim:rgba(0,229,160,0.12);--accent-glow:rgba(0,229,160,0.25);--text:#e8eaf0;--text2:#8b8fa8;--text3:#5a5f72;--danger:#ff4d6d;--danger-dim:rgba(255,77,109,0.12);--warn:#ffb740;--warn-dim:rgba(255,183,64,0.12);--blue:#4d9fff;--blue-dim:rgba(77,159,255,0.12);--r:10px;--r-sm:6px;--shadow:0 4px 24px rgba(0,0,0,0.4)}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;line-height:1.6;min-height:100vh;overflow-x:hidden}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:var(--surface)}
+::-webkit-scrollbar-thumb{background:var(--surface3);border-radius:2px}
+.app{display:grid;grid-template-columns:240px 1fr;grid-template-rows:60px 1fr;min-height:100vh}
+.header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:60px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100}
+.logo{display:flex;align-items:center;gap:10px;font-family:'Syne',sans-serif;font-size:18px;font-weight:800;letter-spacing:-0.5px;color:var(--text)}
+.logo-icon{width:32px;height:32px;background:var(--accent);border-radius:8px;display:flex;align-items:center;justify-content:center;color:#000;font-size:16px}
+.logo span{color:var(--accent)}
+.header-right{display:flex;align-items:center;gap:12px}
+.credit-badge{display:flex;align-items:center;gap:6px;padding:6px 12px;background:var(--accent-dim);border:1px solid var(--accent-glow);border-radius:20px;font-size:12px;font-family:'DM Mono',monospace;color:var(--accent)}
+.status-dot{width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.6;transform:scale(.85)}}
+.sidebar{background:var(--surface);border-right:1px solid var(--border);padding:16px 12px;display:flex;flex-direction:column;gap:4px;overflow-y:auto}
+.nav-label{font-size:10px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);padding:12px 10px 6px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:var(--r-sm);cursor:pointer;color:var(--text2);font-size:13.5px;transition:all .18s;position:relative}
+.nav-item:hover{background:var(--surface2);color:var(--text)}
+.nav-item.active{background:var(--accent-dim);color:var(--accent)}
+.nav-item.active::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:3px;height:20px;background:var(--accent);border-radius:0 2px 2px 0}
+.nav-icon{font-size:16px}
+.nav-badge{margin-left:auto;background:var(--surface3);color:var(--text2);font-size:10px;font-family:'DM Mono',monospace;padding:1px 6px;border-radius:10px}
+.nav-item.active .nav-badge{background:var(--accent-dim);color:var(--accent)}
+.main{overflow-y:auto;padding:28px;background:var(--bg)}
+.page{display:none}.page.active{display:block}
+.page-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px}
+.page-title{font-family:'Syne',sans-serif;font-size:24px;font-weight:700;color:var(--text);line-height:1.2}
+.page-subtitle{color:var(--text2);font-size:13px;margin-top:4px}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:9px 18px;border-radius:var(--r-sm);font-size:13.5px;font-weight:500;font-family:'DM Sans',sans-serif;cursor:pointer;border:none;transition:all .18s}
+.btn-primary{background:var(--accent);color:#000}
+.btn-primary:hover{background:var(--accent2);transform:translateY(-1px);box-shadow:0 4px 16px var(--accent-glow)}
+.btn-outline{background:transparent;color:var(--text);border:1px solid var(--border2)}
+.btn-outline:hover{background:var(--surface2);border-color:var(--accent);color:var(--accent)}
+.btn-danger{background:var(--danger-dim);color:var(--danger);border:1px solid rgba(255,77,109,.2)}
+.btn-danger:hover{background:var(--danger);color:#fff}
+.btn-sm{padding:5px 12px;font-size:12px}
+.btn:disabled{opacity:.45;cursor:not-allowed;transform:none!important;box-shadow:none!important}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:20px}
+.card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.card-title{font-family:'Syne',sans-serif;font-size:15px;font-weight:600;color:var(--text)}
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:18px;position:relative;overflow:hidden}
+.stat-card::after{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.stat-card.green::after{background:var(--accent)}.stat-card.blue::after{background:var(--blue)}.stat-card.warn::after{background:var(--warn)}.stat-card.red::after{background:var(--danger)}
+.stat-value{font-family:'DM Mono',monospace;font-size:28px;font-weight:500;color:var(--text);line-height:1;margin-bottom:4px}
+.stat-label{font-size:12px;color:var(--text2)}
+.stat-change{font-size:11px;margin-top:6px;font-family:'DM Mono',monospace}
+.stat-change.up{color:var(--accent)}.stat-change.down{color:var(--danger)}
+.compose-grid{display:grid;grid-template-columns:1fr 340px;gap:20px;align-items:start}
+label{display:block;font-size:12px;font-weight:500;color:var(--text2);margin-bottom:6px;letter-spacing:.03em}
+input[type="text"],input[type="number"],input[type="tel"],select,textarea{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);padding:10px 13px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13.5px;outline:none;transition:border-color .18s}
+input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim)}
+input::placeholder,textarea::placeholder{color:var(--text3)}
+textarea{resize:vertical;min-height:120px;font-family:'DM Mono',monospace;font-size:13px;line-height:1.65}
+.form-group{margin-bottom:16px}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.char-count{text-align:right;font-size:11px;font-family:'DM Mono',monospace;margin-top:4px}
+.char-count.ok{color:var(--text3)}.char-count.warn{color:var(--warn)}.char-count.over{color:var(--danger)}
+.variable-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.var-chip{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;background:var(--surface3);border:1px solid var(--border);border-radius:20px;font-size:11px;font-family:'DM Mono',monospace;color:var(--accent);cursor:pointer;transition:all .15s}
+.var-chip:hover{background:var(--accent-dim);border-color:var(--accent)}
+.phone-preview{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:20px}
+.phone-frame{background:var(--surface2);border:2px solid var(--surface3);border-radius:28px;padding:24px 16px 20px;margin:0 auto;max-width:240px;position:relative}
+.phone-notch{width:80px;height:6px;background:var(--surface3);border-radius:3px;margin:0 auto 16px}
+.phone-header{display:flex;align-items:center;gap:8px;margin-bottom:14px}
+.phone-avatar{width:30px;height:30px;border-radius:50%;background:var(--accent-dim);display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--accent);font-weight:600}
+.phone-sender{font-size:12px;font-weight:500;color:var(--text)}
+.phone-time{font-size:10px;color:var(--text3)}
+.phone-bubble{background:var(--surface3);border-radius:4px 14px 14px 14px;padding:10px 12px;font-size:12px;color:var(--text);line-height:1.5;word-break:break-word;min-height:40px;transition:all .2s}
+.contact-toolbar{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+.search-box{flex:1;min-width:180px;position:relative}
+.search-box input{padding-left:36px}
+.search-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:14px}
+.contacts-table{width:100%;border-collapse:collapse}
+.contacts-table th{text-align:left;padding:10px 12px;font-size:11px;font-weight:500;color:var(--text3);letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid var(--border);background:var(--surface2)}
+.contacts-table td{padding:11px 12px;border-bottom:1px solid var(--border);font-size:13px;color:var(--text)}
+.contacts-table tr:hover td{background:var(--surface2)}
+.contacts-table tr:last-child td{border-bottom:none}
+.contacts-table input[type="checkbox"]{width:15px;height:15px;accent-color:var(--accent);cursor:pointer}
+.tag{display:inline-flex;align-items:center;padding:2px 8px;border-radius:12px;font-size:11px;font-family:'DM Mono',monospace}
+.tag.green{background:var(--accent-dim);color:var(--accent)}.tag.blue{background:var(--blue-dim);color:var(--blue)}.tag.red{background:var(--danger-dim);color:var(--danger)}.tag.warn{background:var(--warn-dim);color:var(--warn)}
+.select-all-row{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--surface2);border-radius:var(--r-sm) var(--r-sm) 0 0;font-size:12px;color:var(--text2);border:1px solid var(--border);border-bottom:none}
+.history-list{display:flex;flex-direction:column;gap:12px}
+.history-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px 18px;display:grid;grid-template-columns:1fr auto;gap:12px;align-items:start}
+.history-meta{display:flex;align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap}
+.history-title{font-weight:500;font-size:14px;color:var(--text)}
+.history-preview{font-size:12px;color:var(--text2);line-height:1.4;font-family:'DM Mono',monospace;margin-bottom:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:500px}
+.history-stats{display:flex;align-items:center;gap:16px;font-size:11px;font-family:'DM Mono',monospace;flex-wrap:wrap}
+.history-stat{display:flex;align-items:center;gap:4px}
+.history-stat.ok{color:var(--accent)}.history-stat.fail{color:var(--danger)}.history-stat.pend{color:var(--warn)}.history-stat.info{color:var(--text2)}
+.progress-wrap{background:var(--surface2);border-radius:4px;height:4px;overflow:hidden;margin-top:6px}
+.progress-fill{height:100%;border-radius:4px;background:var(--accent);transition:width .3s ease}
+.progress-fill.partial{background:var(--warn)}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;backdrop-filter:blur(4px);align-items:center;justify-content:center}
+.modal-overlay.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border2);border-radius:16px;padding:28px;width:480px;max-width:95vw;box-shadow:var(--shadow);animation:slideUp .2s ease}
+@keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+.modal-title{font-family:'Syne',sans-serif;font-size:18px;font-weight:700;color:var(--text);margin-bottom:6px}
+.modal-sub{font-size:13px;color:var(--text2);margin-bottom:20px}
+.send-animation{text-align:center;padding:20px 0}
+.send-ring{width:64px;height:64px;border:3px solid var(--surface3);border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 16px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.send-count{font-family:'DM Mono',monospace;font-size:28px;font-weight:500;color:var(--accent);line-height:1;margin-bottom:6px}
+.send-progress{display:flex;flex-direction:column;gap:12px;margin:20px 0}
+.send-progress-item{display:flex;align-items:center;justify-content:space-between;font-size:13px;color:var(--text2)}
+.send-progress-value{font-family:'DM Mono',monospace;color:var(--accent)}
+.provider-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.provider-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);padding:14px;cursor:pointer;transition:all .18s;position:relative}
+.provider-card:hover{border-color:var(--accent)}
+.provider-card.selected{border-color:var(--accent);background:var(--accent-dim)}
+.provider-card.selected::after{content:'✓';position:absolute;top:10px;right:10px;width:18px;height:18px;background:var(--accent);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;color:#000;font-weight:700;line-height:18px;text-align:center}
+.provider-name{font-weight:500;font-size:13px;color:var(--text);margin-bottom:3px}
+.provider-desc{font-size:11px;color:var(--text2)}
+.template-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.template-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);padding:14px;cursor:pointer;transition:all .18s}
+.template-card:hover{border-color:var(--accent)}
+.template-name{font-size:12px;font-weight:500;color:var(--text);margin-bottom:6px}
+.template-preview{font-size:11px;color:var(--text2);font-family:'DM Mono',monospace;line-height:1.45;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.toast-container{position:fixed;bottom:24px;right:24px;z-index:300;display:flex;flex-direction:column;gap:8px}
+.toast{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:12px 16px;font-size:13px;display:flex;align-items:center;gap:10px;box-shadow:var(--shadow);animation:toastIn .25s ease;min-width:260px;max-width:340px}
+.toast.success{border-left:3px solid var(--accent)}.toast.error{border-left:3px solid var(--danger)}.toast.info{border-left:3px solid var(--blue)}
+@keyframes toastIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
+.settings-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border)}
+.settings-row:last-child{border:none}
+.settings-label{font-size:13px;color:var(--text)}
+.settings-desc{font-size:12px;color:var(--text2);margin-top:2px}
+.toggle{position:relative;width:40px;height:22px;flex-shrink:0}
+.toggle input{opacity:0;width:0;height:0}
+.toggle-track{position:absolute;inset:0;background:var(--surface3);border-radius:11px;cursor:pointer;transition:background .2s}
+.toggle input:checked+.toggle-track{background:var(--accent)}
+.toggle-track::after{content:'';position:absolute;left:3px;top:3px;width:16px;height:16px;background:#fff;border-radius:50%;transition:transform .2s}
+.toggle input:checked+.toggle-track::after{transform:translateX(18px)}
+.upload-area{border:2px dashed var(--border2);border-radius:var(--r);padding:28px;text-align:center;cursor:pointer;transition:all .2s}
+.upload-area:hover{border-color:var(--accent);background:var(--accent-dim)}
+.mini-bar-chart{display:flex;align-items:flex-end;gap:3px;height:40px}
+.mini-bar{flex:1;background:var(--accent-dim);border-radius:2px 2px 0 0;transition:background .2s}
+.mini-bar:hover{background:var(--accent)}
+.flex{display:flex}.flex-col{flex-direction:column}.gap-2{gap:8px}.gap-3{gap:12px}.gap-4{gap:16px}.items-center{align-items:center}.justify-between{justify-content:space-between}.mt-1{margin-top:4px}.mt-2{margin-top:8px}.mt-3{margin-top:12px}.mb-2{margin-bottom:8px}.mb-3{margin-bottom:12px}.text-sm{font-size:12px;color:var(--text2)}.mono{font-family:'DM Mono',monospace}.divider{height:1px;background:var(--border);margin:16px 0}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- HEADER -->
+<header class="header">
+  <div class="logo">
+    <div class="logo-icon">📡</div>
+    Blast<span>SMS</span>
+  </div>
+  <div class="header-right">
+    <div class="credit-badge">
+      <div class="status-dot"></div>
+      <span id="creditDisplay">2,500 credits</span>
+    </div>
+    <button class="btn btn-outline btn-sm" onclick="showToast('Top-up feature coming soon!','info')">+ Add Credits</button>
+  </div>
+</header>
+
+<!-- SIDEBAR -->
+<nav class="sidebar">
+  <div class="nav-label">Main</div>
+  <div class="nav-item active" onclick="navigate('compose',this)"><span class="nav-icon">✍️</span> Compose</div>
+  <div class="nav-item" onclick="navigate('contacts',this)"><span class="nav-icon">👥</span> Contacts<span class="nav-badge" id="contactBadge">12</span></div>
+  <div class="nav-item" onclick="navigate('templates',this)"><span class="nav-icon">📋</span> Templates<span class="nav-badge">5</span></div>
+  <div class="nav-label">Reports</div>
+  <div class="nav-item" onclick="navigate('history',this)"><span class="nav-icon">📊</span> History<span class="nav-badge">4</span></div>
+  <div class="nav-item" onclick="navigate('analytics',this)"><span class="nav-icon">📈</span> Analytics</div>
+  <div class="nav-label">Config</div>
+  <div class="nav-item" onclick="navigate('settings',this)"><span class="nav-icon">⚙️</span> Settings</div>
+</nav>
+
+<!-- MAIN -->
+<main class="main">
+
+<!-- COMPOSE -->
+<div class="page active" id="page-compose">
+  <div class="page-header">
+    <div>
+      <div class="page-title">Compose Bulk Message</div>
+      <div class="page-subtitle">Write, edit, and send SMS to multiple contacts at once</div>
+    </div>
+    <div class="flex gap-2">
+      <button class="btn btn-outline" onclick="saveDraft()">💾 Save Draft</button>
+      <button class="btn btn-primary" onclick="openSendModal()">📤 Send Now</button>
+    </div>
+  </div>
+
+  <div class="compose-grid">
+    <div>
+      <!-- Recipients -->
+      <div class="card mb-3">
+        <div class="card-header">
+          <div class="card-title">Recipients</div>
+          <button class="btn btn-outline btn-sm" onclick="navigate('contacts',document.querySelectorAll('.nav-item')[1])">Manage →</button>
+        </div>
+        <div class="form-group">
+          <label>Select Group</label>
+          <select id="recipientGroup" onchange="updateRecipientCount()">
+            <option value="">— Choose a group —</option>
+            <option value="all">All Contacts (12)</option>
+            <option value="customers">Customers (8)</option>
+            <option value="leads">Leads (4)</option>
+            <option value="vip">VIP (3)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Or enter numbers manually (comma-separated)</label>
+          <input type="text" id="manualNumbers" placeholder="+91 9876543210, +91 9123456789, …" oninput="updateManualCount()">
+        </div>
+        <div class="flex items-center justify-between mt-2">
+          <div class="text-sm" id="recipientInfo">No recipients selected</div>
+          <div class="tag green" id="recipientCount" style="display:none">0 recipients</div>
+        </div>
+      </div>
+
+      <!-- Message Editor -->
+      <div class="card mb-3">
+        <div class="card-header">
+          <div class="card-title">✏️ Message Editor</div>
+          <div class="flex gap-2">
+            <button class="btn btn-outline btn-sm" onclick="loadTemplate()">📋 Template</button>
+            <button class="btn btn-outline btn-sm" onclick="clearMessage()">🗑 Clear</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Sender ID / Name (max 11 chars)</label>
+          <input type="text" id="senderName" value="MyCompany" maxlength="11" oninput="updatePreview()">
+        </div>
+        <div class="form-group">
+          <label>Message</label>
+          <textarea id="messageContent" rows="6" oninput="updateCharCount();updatePreview()">Hi {name}, thank you for being a valued customer! Use code SAVE20 for 20% off your next order. Reply STOP to unsubscribe.</textarea>
+          <div class="char-count ok" id="charCount">0 / 160 chars · 1 SMS</div>
+        </div>
+        <div>
+          <div class="text-sm mb-2">Insert variable:</div>
+          <div class="variable-chips">
+            <div class="var-chip" onclick="insertVar('{name}')">✦ {name}</div>
+            <div class="var-chip" onclick="insertVar('{phone}')">✦ {phone}</div>
+            <div class="var-chip" onclick="insertVar('{date}')">✦ {date}</div>
+            <div class="var-chip" onclick="insertVar('{code}')">✦ {code}</div>
+            <div class="var-chip" onclick="insertVar('{company}')">✦ {company}</div>
+            <div class="var-chip" onclick="insertVar('{amount}')">✦ {amount}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Schedule -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Schedule (Optional)</div>
+          <label class="toggle"><input type="checkbox" id="scheduleToggle" onchange="toggleSchedule()"><div class="toggle-track"></div></label>
+        </div>
+        <div id="scheduleOptions" style="display:none">
+          <div class="form-row">
+            <div class="form-group"><label>Date</label><input type="date" id="schedDate"></div>
+            <div class="form-group"><label>Time</label><input type="time" id="schedTime"></div>
+          </div>
+          <div class="form-group">
+            <label>Timezone</label>
+            <select><option>UTC+05:30 — India (IST)</option><option>UTC+00:00 — London (GMT)</option><option>UTC-05:00 — New York (EST)</option></select>
+          </div>
+        </div>
+        <div id="schedPlaceholder" class="text-sm">Enable scheduling to send at a specific time</div>
+      </div>
+    </div>
+
+    <!-- RIGHT: Preview + Settings -->
+    <div>
+      <div class="phone-preview mb-3">
+        <div class="card-title mb-2">📱 Live Preview</div>
+        <div class="phone-frame">
+          <div class="phone-notch"></div>
+          <div class="phone-header">
+            <div class="phone-avatar">M</div>
+            <div>
+              <div class="phone-sender" id="previewSender">MyCompany</div>
+              <div class="phone-time">Now</div>
+            </div>
+          </div>
+          <div class="phone-bubble" id="previewBubble">Your message preview appears here…</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title mb-3">Delivery Settings</div>
+        <div class="form-group">
+          <label>SMS Provider</label>
+          <select id="providerSelect">
+            <option>Twilio</option><option>Vonage / Nexmo</option><option>AWS SNS</option><option>Sinch</option><option>MessageBird</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Send Rate</label>
+          <select id="sendRate"><option value="10">10 SMS/sec</option><option value="50" selected>50 SMS/sec</option><option value="100">100 SMS/sec</option></select>
+        </div>
+        <div class="settings-row" style="padding:8px 0">
+          <div><div class="settings-label" style="font-size:13px">Delivery Reports</div><div class="settings-desc">Track each SMS status</div></div>
+          <label class="toggle"><input type="checkbox" checked><div class="toggle-track"></div></label>
+        </div>
+        <div class="settings-row" style="padding:8px 0">
+          <div><div class="settings-label" style="font-size:13px">Unicode Support</div><div class="settings-desc">Emoji + special characters</div></div>
+          <label class="toggle"><input type="checkbox"><div class="toggle-track"></div></label>
+        </div>
+        <div class="divider"></div>
+        <div class="flex justify-between items-center">
+          <div class="text-sm">Estimated cost</div>
+          <div class="mono" style="color:var(--accent);font-size:15px" id="estimatedCost">— credits</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CONTACTS -->
+<div class="page" id="page-contacts">
+  <div class="page-header">
+    <div><div class="page-title">Contacts</div><div class="page-subtitle">Manage your contact list and groups</div></div>
+    <div class="flex gap-2">
+      <button class="btn btn-outline" onclick="toggleImport()">📥 Import CSV</button>
+      <button class="btn btn-primary" onclick="openAddContact()">+ Add Contact</button>
+    </div>
+  </div>
+  <div id="importArea" style="display:none;margin-bottom:16px">
+    <div class="upload-area" onclick="simulateImport()">
+      <div style="font-size:32px;margin-bottom:10px">📄</div>
+      <div style="font-size:14px;color:var(--text2)">Click to upload CSV file</div>
+      <div style="font-size:12px;color:var(--text3);margin-top:4px">Supports: Name, Phone, Group columns</div>
+    </div>
+  </div>
+  <div class="contact-toolbar">
+    <div class="search-box">
+      <span class="search-icon">🔍</span>
+      <input type="text" placeholder="Search by name or number…" oninput="filterContacts(this.value)">
+    </div>
+    <select onchange="filterByGroup(this.value)" style="width:160px">
+      <option value="">All Groups</option><option value="Customers">Customers</option><option value="Leads">Leads</option><option value="VIP">VIP</option>
+    </select>
+    <button class="btn btn-danger btn-sm" id="deleteSelectedBtn" style="display:none" onclick="deleteSelected()">🗑 Delete Selected</button>
+  </div>
+  <div class="card" style="padding:0;overflow:hidden">
+    <div class="select-all-row">
+      <div class="flex items-center gap-2">
+        <input type="checkbox" id="selectAll" onchange="toggleSelectAll(this.checked)">
+        <span id="selectionLabel">Select all</span>
+      </div>
+      <span class="text-sm" id="totalContactDisplay">12 contacts</span>
+    </div>
+    <table class="contacts-table">
+      <thead><tr><th style="width:32px"></th><th>Name</th><th>Phone Number</th><th>Group</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody id="contactsBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- TEMPLATES -->
+<div class="page" id="page-templates">
+  <div class="page-header">
+    <div><div class="page-title">Message Templates</div><div class="page-subtitle">Reusable templates for quick sending</div></div>
+    <button class="btn btn-primary" onclick="addTemplate()">+ New Template</button>
+  </div>
+  <div class="template-grid" id="templateGrid"></div>
+</div>
+
+<!-- HISTORY -->
+<div class="page" id="page-history">
+  <div class="page-header">
+    <div><div class="page-title">Send History</div><div class="page-subtitle">All previous bulk SMS campaigns</div></div>
+    <button class="btn btn-outline" onclick="showToast('Report exported to CSV!','success')">📥 Export</button>
+  </div>
+  <div class="history-list" id="historyList"></div>
+</div>
+
+<!-- ANALYTICS -->
+<div class="page" id="page-analytics">
+  <div class="page-header"><div><div class="page-title">Analytics</div><div class="page-subtitle">Delivery and performance metrics</div></div></div>
+  <div class="stats-row">
+    <div class="stat-card green"><div style="font-size:22px;margin-bottom:10px">📤</div><div class="stat-value" id="analyticsTotalSent">0</div><div class="stat-label">Total Sent</div><div class="stat-change up" id="analyticsLastDate">No sends yet</div></div>
+    <div class="stat-card blue"><div style="font-size:22px;margin-bottom:10px">✅</div><div class="stat-value" id="analyticsDeliveryRate">0%</div><div class="stat-label">Delivery Rate</div><div class="stat-change up" id="analyticsDelivered">0 delivered</div></div>
+    <div class="stat-card warn"><div style="font-size:22px;margin-bottom:10px">❌</div><div class="stat-value" id="analyticsFailedRate">0%</div><div class="stat-label">Failed Rate</div><div class="stat-change down" id="analyticsFailed">0 failed</div></div>
+    <div class="stat-card red"><div style="font-size:22px;margin-bottom:10px">💰</div><div class="stat-value" id="analyticsCreditsUsed">0</div><div class="stat-label">Credits Used</div><div class="stat-change down" id="analyticsCampaigns">0 campaigns</div></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div class="card">
+      <div class="card-title mb-3">Daily Volume (last 7 days)</div>
+      <div class="mini-bar-chart" id="analyticsBars">
+        <div class="mini-bar" style="height:8%"></div><div class="mini-bar" style="height:8%"></div><div class="mini-bar" style="height:8%"></div>
+        <div class="mini-bar" style="height:8%"></div><div class="mini-bar" style="height:8%"></div><div class="mini-bar" style="height:8%"></div>
+        <div class="mini-bar" style="height:8%;background:var(--accent)"></div>
+      </div>
+      <div class="flex justify-between mt-2">
+        <div class="text-sm">Mon</div><div class="text-sm">Tue</div><div class="text-sm">Wed</div><div class="text-sm">Thu</div><div class="text-sm">Fri</div><div class="text-sm">Sat</div><div class="text-sm" style="color:var(--accent)">Today</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title mb-3">Delivery Breakdown</div>
+      <div class="flex flex-col gap-3">
+        <div><div class="flex justify-between mb-1"><span class="text-sm" style="color:var(--accent)">Delivered</span><span class="mono" style="font-size:12px;color:var(--accent)" id="analyticsDeliveredPct">0%</span></div><div class="progress-wrap"><div class="progress-fill" id="analyticsDeliveredBar" style="width:0%"></div></div></div>
+        <div><div class="flex justify-between mb-1"><span class="text-sm" style="color:var(--warn)">Pending</span><span class="mono" style="font-size:12px;color:var(--warn)" id="analyticsPendingPct">0%</span></div><div class="progress-wrap"><div class="progress-fill partial" id="analyticsPendingBar" style="width:0%"></div></div></div>
+        <div><div class="flex justify-between mb-1"><span class="text-sm" style="color:var(--danger)">Failed</span><span class="mono" style="font-size:12px;color:var(--danger)" id="analyticsFailedPct">0%</span></div><div class="progress-wrap"><div class="progress-fill" id="analyticsFailedBar" style="width:0%;background:var(--danger)"></div></div></div>
+      </div>
+      <div class="divider"></div>
+      <div class="flex justify-between"><div class="text-sm">Top Provider</div><div class="tag green">Twilio</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- SETTINGS -->
+<div class="page" id="page-settings">
+  <div class="page-header">
+    <div><div class="page-title">Settings</div><div class="page-subtitle">Configure SMS provider and preferences</div></div>
+    <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+    <div>
+      <div class="card mb-3">
+        <div class="card-title mb-3">SMS Provider Configuration</div>
+        <div class="form-group"><label>Active Provider</label><select><option>Twilio</option><option>Vonage</option><option>AWS SNS</option></select></div>
+        <div class="form-group"><label>API Key / Account SID</label><input type="text" value="YOUR_ACCOUNT_SID"></div>
+        <div class="form-group"><label>API Secret / Auth Token</label><input type="text" value="YOUR_AUTH_TOKEN"></div>
+        <div class="form-group"><label>Default Sender Number</label><input type="tel" value="+919175600702"></div>
+        <button class="btn btn-outline btn-sm" onclick="showToast('Connection successful! ✓','success')">Test Connection</button>
+      </div>
+      <div class="card">
+        <div class="card-title mb-3">Provider Quick Select</div>
+        <div class="provider-grid">
+          <div class="provider-card selected" onclick="selectProvider(this)"><div class="provider-name">Twilio</div><div class="provider-desc">Global, reliable</div></div>
+          <div class="provider-card" onclick="selectProvider(this)"><div class="provider-name">Vonage</div><div class="provider-desc">EU/Asia coverage</div></div>
+          <div class="provider-card" onclick="selectProvider(this)"><div class="provider-name">AWS SNS</div><div class="provider-desc">Pay-per-use</div></div>
+          <div class="provider-card" onclick="selectProvider(this)"><div class="provider-name">Sinch</div><div class="provider-desc">High-volume</div></div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="card mb-3">
+        <div class="card-title mb-3">Message Preferences</div>
+        <div class="settings-row"><div><div class="settings-label">Opt-out Footer</div><div class="settings-desc">Auto-append "Reply STOP to unsubscribe"</div></div><label class="toggle"><input type="checkbox" checked><div class="toggle-track"></div></label></div>
+        <div class="settings-row"><div><div class="settings-label">Delivery Receipts</div><div class="settings-desc">Track each SMS delivery</div></div><label class="toggle"><input type="checkbox" checked><div class="toggle-track"></div></label></div>
+        <div class="settings-row"><div><div class="settings-label">Unicode Messages</div><div class="settings-desc">Support emoji and special chars</div></div><label class="toggle"><input type="checkbox"><div class="toggle-track"></div></label></div>
+        <div class="settings-row"><div><div class="settings-label">Duplicate Check</div><div class="settings-desc">Skip duplicate phone numbers</div></div><label class="toggle"><input type="checkbox" checked><div class="toggle-track"></div></label></div>
+        <div class="settings-row"><div><div class="settings-label">Email Alerts</div><div class="settings-desc">Notify when campaign completes</div></div><label class="toggle"><input type="checkbox" checked><div class="toggle-track"></div></label></div>
+      </div>
+      <div class="card">
+        <div class="card-title mb-3">Rate Limits</div>
+        <div class="form-group"><label>Max SMS per second</label><input type="number" value="50"></div>
+        <div class="form-group"><label>Daily send limit</label><input type="number" value="10000"></div>
+        <div class="form-group"><label>Cooldown between campaigns (min)</label><input type="number" value="5"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</main>
+</div>
+<script>
+function getRecipients() {
+
+  const group =
+    document.getElementById("recipientGroup").value;
+
+  let phones = [];
+
+  if(group === "all"){
+
+    phones =
+      contacts.map(c => c.phone);
+
+  }
+  else if(group === "customers"){
+
+    phones =
+      contacts
+      .filter(c => c.group === "Customers")
+      .map(c => c.phone);
+
+  }
+  else if(group === "leads"){
+
+    phones =
+      contacts
+      .filter(c => c.group === "Leads")
+      .map(c => c.phone);
+
+  }
+  else if(group === "vip"){
+
+    phones =
+      contacts
+      .filter(c => c.group === "VIP")
+      .map(c => c.phone);
+
+  }
+
+  const manual =
+    document.getElementById("manualNumbers")
+    .value
+    .trim();
+
+  if(manual){
+
+    phones.push(
+      ...manual
+        .split(/[\n,;]+/)
+        .map(normalizePhone)
+        .filter(isValidPhone)
+    );
+
+  }
+
+  return [...new Set(phones.map(normalizePhone).filter(isValidPhone))];
+}
+</script>
+<!-- SEND MODAL -->
+<div class="modal-overlay" id="sendModal">
+  <div class="modal">
+    <div id="sendStep1">
+      <div class="modal-title">🚀 Send Bulk SMS</div>
+      <div class="modal-sub">Review your campaign before sending</div>
+      <div class="card" style="padding:14px;margin-bottom:16px">
+        <div class="flex flex-col gap-3">
+          <div class="flex justify-between"><span class="text-sm">Recipients</span><span class="mono" id="modalRecipients">0</span></div>
+          <div class="flex justify-between"><span class="text-sm">Message length</span><span class="mono" id="modalMsgLen">0 chars</span></div>
+          <div class="flex justify-between"><span class="text-sm">Provider</span><span class="mono" id="modalProvider">Twilio</span></div>
+          <div class="flex justify-between"><span class="text-sm">Credits required</span><span class="mono" style="color:var(--accent)" id="modalCredits">0</span></div>
+          <div class="flex justify-between"><span class="text-sm">Schedule</span><span class="mono" id="modalSchedule">Immediate</span></div>
+        </div>
+      </div>
+      <div style="background:var(--surface2);border-radius:var(--r-sm);padding:12px;margin-bottom:16px;font-family:'DM Mono',monospace;font-size:12px;color:var(--text2);line-height:1.5" id="modalMsgPreview"></div>
+      <div class="flex gap-2 justify-between">
+        <button class="btn btn-outline" onclick="closeSendModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="startSending()">Confirm & Send →</button>
+      </div>
+    </div>
+    <div id="sendStep2" style="display:none">
+      <div class="send-animation">
+        <div class="send-ring"></div>
+        <div class="send-count" id="sentCount">0</div>
+        <div style="font-size:12px;color:var(--text2)" id="sendStatusLabel">Connecting…</div>
+      </div>
+      <div class="send-progress">
+        <div class="send-progress-item"><span>Sent</span><span class="send-progress-value" id="pSent">0</span></div>
+        <div class="send-progress-item"><span>Delivered</span><span class="send-progress-value" style="color:var(--accent)" id="pDelivered">0</span></div>
+        <div class="send-progress-item"><span>Failed</span><span class="send-progress-value" style="color:var(--danger)" id="pFailed">0</span></div>
+        <div class="send-progress-item"><span>Remaining</span><span class="send-progress-value" style="color:var(--warn)" id="pRemaining">—</span></div>
+      </div>
+      <div class="progress-wrap" style="height:6px;border-radius:3px;margin-top:12px">
+        <div class="progress-fill" id="sendProgressBar" style="width:0%"></div>
+      </div>
+    </div>
+    <div id="sendStep3" style="display:none">
+      <div style="text-align:center;padding:20px 0">
+        <div style="font-size:48px;margin-bottom:12px">✅</div>
+        <div class="modal-title" style="margin-bottom:6px">Campaign Sent!</div>
+        <div class="text-sm" id="finalSummary" style="margin-bottom:20px"></div>
+        <div class="flex gap-2 justify-center">
+          <button class="btn btn-outline" onclick="closeSendModal();navigate('history',document.querySelectorAll('.nav-item')[3])">View History →</button>
+          <button class="btn btn-primary" onclick="closeSendModal()">Done</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ADD CONTACT MODAL -->
+<div class="modal-overlay" id="addContactModal">
+  <div class="modal">
+    <div class="modal-title">Add Contact</div>
+    <div class="modal-sub">Add a new contact to your list</div>
+    <div class="form-group"><label>Full Name</label><input type="text" id="newName" placeholder="e.g. Priya Sharma"></div>
+    <div class="form-group"><label>Phone Number</label><input type="tel" id="newPhone" placeholder="+91 9876543210"></div>
+    <div class="form-group"><label>Group</label><select id="newGroup"><option>Customers</option><option>Leads</option><option>VIP</option></select></div>
+    <div class="flex gap-2 justify-between mt-3">
+      <button class="btn btn-outline" onclick="closeModal('addContactModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveNewContact()">Add Contact</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<script type="text/javascript">
+// ── DATA ──────────────────────────────────────────────────────────
+const CONTACTS_STORAGE_KEY='blastSms.contacts';
+const HISTORY_STORAGE_KEY='blastSms.history';
+const TEMPLATES_STORAGE_KEY='blastSms.templates';
+
+function loadStoredData(key,fallback){
+  try{
+    const raw=localStorage.getItem(key);
+    return raw?JSON.parse(raw):fallback;
+  }catch(error){
+    return fallback;
+  }
+}
+
+function saveStoredData(key,data){
+  localStorage.setItem(key,JSON.stringify(data));
+}
+
+function normalizePhone(value){
+  return String(value||'').trim().replace(/[^\d+]/g,'');
+}
+
+function isValidPhone(value){
+  return /^\+\d{10,15}$/.test(value||'');
+}
+
+const defaultContacts=[
+  {id:1,name:'Priya Sharma',phone:'+919876543210',group:'Customers',status:'active',selected:false},
+  {id:2,name:'Rahul Gupta',phone:'+919123456789',group:'Leads',status:'active',selected:false},
+  {id:3,name:'Anjali Singh',phone:'+917654321098',group:'VIP',status:'active',selected:false},
+  {id:4,name:'Vikram Nair',phone:'+918765432109',group:'Customers',status:'active',selected:false},
+  {id:5,name:'Deepa Menon',phone:'+919988776655',group:'Customers',status:'active',selected:false},
+  {id:6,name:'Arjun Reddy',phone:'+918877665544',group:'Leads',status:'inactive',selected:false},
+  {id:7,name:'Sunita Patel',phone:'+917766554433',group:'VIP',status:'active',selected:false},
+  {id:8,name:'Kiran Kumar',phone:'+916655443322',group:'Customers',status:'active',selected:false},
+  {id:9,name:'Meena Iyer',phone:'+915544332211',group:'Leads',status:'active',selected:false},
+  {id:10,name:'Suresh Bose',phone:'+914433221100',group:'Customers',status:'active',selected:false},
+  {id:11,name:'Lakshmi Rao',phone:'+913322110099',group:'VIP',status:'active',selected:false},
+  {id:12,name:'Mohan Das',phone:'+912211009988',group:'Leads',status:'inactive',selected:false},
+];
+
+let contacts=loadStoredData(CONTACTS_STORAGE_KEY,defaultContacts);
+let filteredContacts=[...contacts];
+
+const defaultTemplates=[
+  {id:1,name:'Welcome Message',content:'Hi {name}! Welcome to {company}. We\'re glad to have you on board. Explore our services now!'},
+  {id:2,name:'Promo / Offer',content:'Hi {name}! Exclusive offer: Use code {code} and get 20% OFF your next purchase. Valid till {date}. Shop now!'},
+  {id:3,name:'OTP / Verification',content:'Your verification code is {code}. This code expires in 10 minutes. Do not share with anyone.'},
+  {id:4,name:'Appointment Reminder',content:'Hi {name}, reminder for your appointment on {date}. Please arrive 10 minutes early. Reply STOP to cancel.'},
+  {id:5,name:'Payment Reminder',content:'Hi {name}, your payment of {amount} is due on {date}. Please pay to avoid late fees. Thank you.'},
+];
+
+let templates=loadStoredData(TEMPLATES_STORAGE_KEY,defaultTemplates);
+
+const defaultHistory=[
+  {id:1,name:'Summer Sale Campaign',preview:'Hi Priya, get 30% off on all items this summer…',sent:450,delivered:432,failed:18,date:'May 3, 2026',provider:'Twilio'},
+  {id:2,name:'OTP Blast — May 2',preview:'Your verification code is 482910…',sent:234,delivered:230,failed:4,date:'May 2, 2026',provider:'Twilio'},
+  {id:3,name:'April Newsletter',preview:'Hi Rahul, check out our latest updates for April…',sent:820,delivered:791,failed:29,date:'Apr 28, 2026',provider:'Vonage'},
+  {id:4,name:'Payment Reminders',preview:'Hi Vikram, your bill of 1500 is due on May 1…',sent:156,delivered:150,failed:6,date:'Apr 25, 2026',provider:'AWS SNS'},
+];
+
+let history=loadStoredData(HISTORY_STORAGE_KEY,defaultHistory);
+let credits=2500;
+let nextId=Math.max(0,...contacts.map(c=>c.id||0))+1;
+
+// ── NAVIGATE ──────────────────────────────────────────────────────
+function navigate(page,el){
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  if(el)el.classList.add('active');
+  const pg=document.getElementById('page-'+page);
+  if(pg)pg.classList.add('active');
+  if(page==='contacts')renderContacts();
+  if(page==='templates')renderTemplates();
+  if(page==='history')renderHistory();
+  if(page==='analytics')renderAnalytics();
+}
+
+// ── COMPOSE ───────────────────────────────────────────────────────
+function updateCharCount(){
+  const ta=document.getElementById('messageContent');
+  const len=ta.value.length;
+  const sms=Math.ceil(len/160)||1;
+  const el=document.getElementById('charCount');
+  el.textContent=`${len} / ${sms*160} chars · ${sms} SMS`;
+  el.className='char-count '+(len>320?'over':len>160?'warn':'ok');
+  updateEstCost();
+}
+
+function updatePreview(){
+  const msg=document.getElementById('messageContent').value;
+  const sender=(document.getElementById('senderName').value||'Sender').substring(0,11);
+  const preview=msg.replace(/{name}/g,'Priya').replace(/{phone}/g,'+91 9876543210').replace(/{date}/g,'May 15').replace(/{code}/g,'SAVE20').replace(/{company}/g,'MyCompany').replace(/{amount}/g,'₹1,500');
+  document.getElementById('previewBubble').textContent=preview||'Your message preview…';
+  document.getElementById('previewSender').textContent=sender;
+}
+
+function updateRecipientCount(){
+  const g=document.getElementById('recipientGroup').value;
+  const n=getRecipients().length;
+  const el=document.getElementById('recipientCount');
+  if(n>0){el.style.display='inline-flex';el.textContent=n+' recipients';document.getElementById('recipientInfo').textContent='';}
+  else{el.style.display='none';document.getElementById('recipientInfo').textContent='No recipients selected';}
+  updateEstCost();
+}
+
+function updateManualCount(){
+  const v=document.getElementById('manualNumbers').value.trim();
+  const nums=v.split(/[\n,;]+/).map(normalizePhone).filter(isValidPhone);
+  const el=document.getElementById('recipientCount');
+  if(nums.length>0){el.style.display='inline-flex';el.textContent=nums.length+' numbers';}
+  updateEstCost();
+}
+
+function getRecipientCount(){
+  return getRecipients().length;
+}
+
+function updateEstCost(){
+  const n=getRecipientCount();
+  const sms=Math.ceil((document.getElementById('messageContent').value.length||1)/160);
+  document.getElementById('estimatedCost').textContent=n>0?(n*sms)+' credits':'— credits';
+}
+
+function insertVar(v){
+  const ta=document.getElementById('messageContent');
+  const s=ta.selectionStart,e=ta.selectionEnd;
+  ta.value=ta.value.slice(0,s)+v+ta.value.slice(e);
+  ta.selectionStart=ta.selectionEnd=s+v.length;
+  ta.focus();updateCharCount();updatePreview();
+}
+
+function clearMessage(){
+  document.getElementById('messageContent').value='';
+  updateCharCount();updatePreview();showToast('Message cleared','info');
+}
+
+function saveDraft(){showToast('Draft saved! ✓','success');}
+
+function toggleSchedule(){
+  const on=document.getElementById('scheduleToggle').checked;
+  document.getElementById('scheduleOptions').style.display=on?'block':'none';
+  document.getElementById('schedPlaceholder').style.display=on?'none':'block';
+}
+
+function loadTemplate(){
+  const t=templates[Math.floor(Math.random()*templates.length)];
+  document.getElementById('messageContent').value=t.content;
+  updateCharCount();updatePreview();
+  showToast('Template "'+t.name+'" loaded ✓','success');
+}
+
+// ── SEND MODAL ────────────────────────────────────────────────────
+function openSendModal(){
+  const n=getRecipientCount();
+  if(!n){showToast('Please select recipients first!','error');return;}
+  const msg=document.getElementById('messageContent').value.trim();
+  if(!msg){showToast('Please write a message!','error');return;}
+  const sms=Math.ceil(msg.length/160)||1;
+  const cost=n*sms;
+  if(cost>credits){showToast('Not enough credits! Please top up.','error');return;}
+  document.getElementById('modalRecipients').textContent=n+' contacts';
+  document.getElementById('modalMsgLen').textContent=msg.length+' chars · '+sms+' SMS';
+  document.getElementById('modalProvider').textContent=document.getElementById('providerSelect').selectedOptions[0].text;
+  document.getElementById('modalCredits').textContent=cost+' credits';
+  document.getElementById('modalSchedule').textContent=document.getElementById('scheduleToggle').checked?'Scheduled':'Immediate';
+  document.getElementById('modalMsgPreview').textContent=msg.substring(0,120)+(msg.length>120?'…':'');
+  document.getElementById('sendStep1').style.display='block';
+  document.getElementById('sendStep2').style.display='none';
+  document.getElementById('sendStep3').style.display='none';
+  document.getElementById('sendModal').classList.add('open');
+}
+
+function closeSendModal(){document.getElementById('sendModal').classList.remove('open');}
+async function startSending(){
+
+  document.getElementById('sendStep1').style.display='none';
+  document.getElementById('sendStep2').style.display='block';
+
+  const recipients = getRecipients();
+
+  const message =
+    document.getElementById('messageContent').value;
+
+  document.getElementById(
+    'sendStatusLabel'
+  ).textContent = 'Sending messages...';
+
+  try {
+
+    const response =
+      await fetch(
+        'http://localhost:5000/send-bulk-sms',
+        {
+          method:'POST',
+          headers:{
+            'Content-Type':'application/json'
+          },
+          body:JSON.stringify({
+            recipients,
+            message,
+            senderName:document.getElementById('senderName').value
+          })
+        }
+      );
+
+    const results =
+      await response.json();
+
+    if(!response.ok){
+      throw new Error(results.error||'Unable to send SMS');
+    }
+
+    const sent =
+      results.length;
+
+    const delivered =
+      results.filter(
+        r => r.success
+      ).length;
+
+    const failed =
+      results.filter(
+        r => !r.success
+      ).length;
+
+    finishSending(
+      sent,
+      delivered,
+      failed,
+      results
+    );
+
+  }
+  catch(error){
+
+    showToast(
+      error.message,
+      'error'
+    );
+
+  }
+
+}
+function finishSending(sent,delivered,failed,results){
+  const smsSegments =
+  Math.ceil(
+    document
+      .getElementById(
+        'messageContent'
+      )
+      .value.length / 160
+  );
+
+credits =
+ Math.max(
+   0,
+   credits - (sent * smsSegments)
+ );
+  document.getElementById('creditDisplay').textContent=credits.toLocaleString()+' credits';
+  document.getElementById('sendStep2').style.display='none';
+  document.getElementById('sendStep3').style.display='block';
+  document.getElementById('finalSummary').textContent=`Sent: ${sent} · Delivered: ${delivered} · Failed: ${failed} · Credits used: ${sent}`;
+  history.unshift({id:Date.now(),name:'Campaign — '+new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short'}),preview:document.getElementById('messageContent').value,sent,delivered,failed,date:new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}),provider:document.getElementById('providerSelect').selectedOptions[0].text});
+  history[0].timestamp=new Date().toISOString();
+  history[0].results=results||[];
+  saveStoredData(HISTORY_STORAGE_KEY,history);
+  renderHistory();
+  renderAnalytics();
+  showToast('Campaign sent! '+delivered+' delivered ✓','success');
+}
+
+// ── CONTACTS ──────────────────────────────────────────────────────
+function renderContacts(list){
+  const data=list||filteredContacts;
+  const tb=document.getElementById('contactsBody');
+  if(data.length===0){tb.innerHTML='<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--text3)">No contacts found</td></tr>';return;}
+  tb.innerHTML=data.map(c=>`
+    <tr>
+      <td><input type="checkbox" ${c.selected?'checked':''} onchange="toggleContact(${c.id},this.checked)"></td>
+      <td><strong>${c.name}</strong></td>
+      <td class="mono" style="font-size:12px;color:var(--text2)">${c.phone}</td>
+      <td><span class="tag ${c.group==='VIP'?'warn':c.group==='Leads'?'blue':'green'}">${c.group}</span></td>
+      <td><span class="tag ${c.status==='active'?'green':'red'}">${c.status}</span></td>
+      <td><div class="flex gap-2"><button class="btn btn-outline btn-sm" onclick="editContact(${c.id})">✏️</button><button class="btn btn-danger btn-sm" onclick="deleteContact(${c.id})">🗑</button></div></td>
+    </tr>`).join('');
+  document.getElementById('totalContactDisplay').textContent=data.length+' contacts';
+  document.getElementById('contactBadge').textContent=contacts.length;
+  updateDeleteBtn();
+}
+
+function filterContacts(q){
+  filteredContacts=contacts.filter(c=>c.name.toLowerCase().includes(q.toLowerCase())||c.phone.includes(q));
+  renderContacts();
+}
+
+function filterByGroup(g){
+  filteredContacts=g?contacts.filter(c=>c.group===g):[...contacts];
+  renderContacts();
+}
+
+function toggleContact(id,checked){
+  contacts.find(c=>c.id===id&&(c.selected=checked));
+  filteredContacts.forEach(c=>c.id===id&&(c.selected=checked));
+  saveStoredData(CONTACTS_STORAGE_KEY,contacts);
+  updateDeleteBtn();
+}
+
+function toggleSelectAll(checked){
+  filteredContacts.forEach(c=>{c.selected=checked;const o=contacts.find(x=>x.id===c.id);if(o)o.selected=checked;});
+  saveStoredData(CONTACTS_STORAGE_KEY,contacts);
+  renderContacts();
+  document.getElementById('selectionLabel').textContent=checked?'Deselect all':'Select all';
+}
+
+function updateDeleteBtn(){
+  document.getElementById('deleteSelectedBtn').style.display=contacts.some(c=>c.selected)?'inline-flex':'none';
+}
+
+function deleteContact(id){
+  contacts=contacts.filter(c=>c.id!==id);filteredContacts=filteredContacts.filter(c=>c.id!==id);
+  saveStoredData(CONTACTS_STORAGE_KEY,contacts);
+  renderContacts();showToast('Contact deleted','info');
+}
+
+function deleteSelected(){
+  const n=contacts.filter(c=>c.selected).length;
+  contacts=contacts.filter(c=>!c.selected);filteredContacts=filteredContacts.filter(c=>!c.selected);
+  saveStoredData(CONTACTS_STORAGE_KEY,contacts);
+  renderContacts();showToast(n+' contacts deleted','info');
+}
+
+function editContact(id){
+  const c=contacts.find(c=>c.id===id);if(!c)return;
+  const nn=prompt('Edit name:',c.name);if(!nn||!nn.trim())return;
+  c.name=nn.trim();
+  filteredContacts.forEach(f=>{if(f.id===id)f.name=c.name;});
+  saveStoredData(CONTACTS_STORAGE_KEY,contacts);
+  renderContacts();showToast('Contact updated ✓','success');
+}
+
+function openAddContact(){document.getElementById('addContactModal').classList.add('open');}
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+
+function saveNewContact(){
+  const name=document.getElementById('newName').value.trim();
+  const phone=normalizePhone(document.getElementById('newPhone').value);
+  const group=document.getElementById('newGroup').value;
+  if(!name||!isValidPhone(phone)){showToast('Please enter a valid name and E.164 phone number','error');return;}
+  if(contacts.some(c=>c.phone===phone)){showToast('Phone number already exists','error');return;}
+  const c={id:nextId++,name,phone,group,status:'active',selected:false};
+  contacts.push(c);filteredContacts.push(c);
+  saveStoredData(CONTACTS_STORAGE_KEY,contacts);
+  closeModal('addContactModal');
+  document.getElementById('newName').value='';document.getElementById('newPhone').value='';
+  renderContacts();showToast('"'+name+'" added ✓','success');
+}
+
+function toggleImport(){
+  const a=document.getElementById('importArea');
+  a.style.display=a.style.display==='none'?'block':'none';
+}
+
+function simulateImport(){
+  [{n:'Imported User 1',p:'+911234567890',g:'Leads'},{n:'Imported User 2',p:'+919988001122',g:'Customers'},{n:'Imported User 3',p:'+917788001122',g:'Leads'}].forEach(({n,p,g})=>{
+    const c={id:nextId++,name:n,phone:p,group:g,status:'active',selected:false};
+    contacts.push(c);filteredContacts.push(c);
+  });
+  saveStoredData(CONTACTS_STORAGE_KEY,contacts);
+  document.getElementById('importArea').style.display='none';
+  renderContacts();showToast('3 contacts imported ✓','success');
+}
+
+// ── TEMPLATES ─────────────────────────────────────────────────────
+function renderTemplates(){
+  document.getElementById('templateGrid').innerHTML=templates.map(t=>`
+    <div class="template-card" onclick="useTemplate(${t.id})">
+      <div class="template-name">📝 ${t.name}</div>
+      <div class="template-preview">${t.content}</div>
+      <div class="flex gap-2 mt-2">
+        <button class="btn btn-outline btn-sm" onclick="event.stopPropagation();editTemplate(${t.id})">✏️ Edit</button>
+        <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteTemplate(${t.id})">🗑</button>
+      </div>
+    </div>`).join('')+`
+    <div class="template-card" style="border-style:dashed;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:120px;color:var(--text3)" onclick="addTemplate()">
+      <div style="font-size:28px;margin-bottom:8px">+</div><div style="font-size:13px">New Template</div>
+    </div>`;
+}
+
+function useTemplate(id){
+  const t=templates.find(t=>t.id===id);if(!t)return;
+  navigate('compose',document.querySelectorAll('.nav-item')[0]);
+  document.getElementById('messageContent').value=t.content;
+  updateCharCount();updatePreview();showToast('"'+t.name+'" applied ✓','success');
+}
+
+function editTemplate(id){
+  const t=templates.find(t=>t.id===id);if(!t)return;
+  const c=prompt('Edit template:',t.content);
+  if(c&&c.trim()){t.content=c.trim();saveStoredData(TEMPLATES_STORAGE_KEY,templates);renderTemplates();showToast('Template updated ✓','success');}
+}
+
+function deleteTemplate(id){
+  templates=templates.filter(t=>t.id!==id);saveStoredData(TEMPLATES_STORAGE_KEY,templates);renderTemplates();showToast('Template deleted','info');
+}
+
+function addTemplate(){
+  const name=prompt('Template name:');if(!name)return;
+  const content=prompt('Message content (use {name}, {code}, {date}, {amount}):');if(!content)return;
+  templates.push({id:Date.now(),name:name.trim(),content:content.trim()});
+  saveStoredData(TEMPLATES_STORAGE_KEY,templates);
+  renderTemplates();showToast('"'+name+'" created ✓','success');
+}
+
+// ── HISTORY ───────────────────────────────────────────────────────
+function renderHistory(){
+  const list=document.getElementById('historyList');
+  if(!history.length){
+    list.innerHTML='<div class="card" style="padding:24px;text-align:center;color:var(--text3)">No SMS history saved yet</div>';
+    return;
+  }
+
+  list.innerHTML=history.map(h=>{
+    const sent=Number(h.sent)||0;
+    const delivered=Number(h.delivered)||0;
+    const failed=Number(h.failed)||0;
+    const pct=sent?Math.round((delivered/sent)*100):0;
+    const date=h.timestamp?new Date(h.timestamp).toLocaleString():h.date;
+
+    return `
+    <div class="history-card">
+      <div>
+        <div class="history-meta">
+          <div class="history-title">${h.name}</div>
+          <div class="tag blue">${h.provider||'Twilio'}</div>
+          <div class="text-sm">${date}</div>
+        </div>
+        <div class="history-preview">${h.preview}</div>
+        <div class="history-stats">
+          <div class="history-stat info">Sent ${sent}</div>
+          <div class="history-stat ok">Success ${delivered}</div>
+          <div class="history-stat fail">Failed ${failed}</div>
+          <div class="history-stat pend">Rate ${pct}%</div>
+        </div>
+        <div class="progress-wrap mt-2" style="max-width:300px"><div class="progress-fill" style="width:${pct}%"></div></div>
+      </div>
+      <div class="flex flex-col gap-2">
+        <button class="btn btn-outline btn-sm" onclick="resendCampaign(${h.id})">Resend</button>
+        <button class="btn btn-outline btn-sm" onclick="showToast('Report exported!','success')">Report</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderAnalytics(){
+  const totalSent=history.reduce((sum,h)=>sum+(Number(h.sent)||0),0);
+  const totalDelivered=history.reduce((sum,h)=>sum+(Number(h.delivered)||0),0);
+  const totalFailed=history.reduce((sum,h)=>sum+(Number(h.failed)||0),0);
+  const deliveredPct=totalSent?((totalDelivered/totalSent)*100).toFixed(1):'0.0';
+  const failedPct=totalSent?((totalFailed/totalSent)*100).toFixed(1):'0.0';
+  const pendingPct='0.0';
+  const latest=history[0];
+
+  document.getElementById('analyticsTotalSent').textContent=totalSent.toLocaleString();
+  document.getElementById('analyticsDeliveryRate').textContent=deliveredPct+'%';
+  document.getElementById('analyticsFailedRate').textContent=failedPct+'%';
+  document.getElementById('analyticsCreditsUsed').textContent=totalSent.toLocaleString();
+  document.getElementById('analyticsLastDate').textContent=latest?'Last send '+(latest.timestamp?new Date(latest.timestamp).toLocaleDateString():latest.date):'No sends yet';
+  document.getElementById('analyticsDelivered').textContent=totalDelivered.toLocaleString()+' successful';
+  document.getElementById('analyticsFailed').textContent=totalFailed.toLocaleString()+' failed';
+  document.getElementById('analyticsCampaigns').textContent=history.length+' campaigns';
+  document.getElementById('analyticsDeliveredPct').textContent=deliveredPct+'%';
+  document.getElementById('analyticsPendingPct').textContent=pendingPct+'%';
+  document.getElementById('analyticsFailedPct').textContent=failedPct+'%';
+  document.getElementById('analyticsDeliveredBar').style.width=deliveredPct+'%';
+  document.getElementById('analyticsPendingBar').style.width=pendingPct+'%';
+  document.getElementById('analyticsFailedBar').style.width=failedPct+'%';
+
+  const last7=[...Array(7)].map((_,i)=>{
+    const d=new Date();
+    d.setDate(d.getDate()-(6-i));
+    const key=d.toISOString().slice(0,10);
+    return {key,total:0};
+  });
+
+  history.forEach(h=>{
+    const sourceDate=h.timestamp?new Date(h.timestamp):new Date(h.date);
+    if(Number.isNaN(sourceDate.getTime()))return;
+    const key=sourceDate.toISOString().slice(0,10);
+    const day=last7.find(d=>d.key===key);
+    if(day)day.total+=Number(h.sent)||0;
+  });
+
+  const max=Math.max(1,...last7.map(d=>d.total));
+  document.getElementById('analyticsBars').innerHTML=last7.map((day,index)=>{
+    const height=Math.max(8,Math.round((day.total/max)*100));
+    return '<div class="mini-bar" title="'+day.key+': '+day.total+' SMS" style="height:'+height+'%;'+(index===6?'background:var(--accent)':'')+'"></div>';
+  }).join('');
+}
+
+function resendCampaign(id){
+  const h=history.find(h=>h.id===id);if(!h)return;
+  navigate('compose',document.querySelectorAll('.nav-item')[0]);
+  document.getElementById('messageContent').value=h.preview;
+  updateCharCount();updatePreview();showToast('Campaign loaded for resend ✓','info');
+}
+
+// ── SETTINGS ──────────────────────────────────────────────────────
+function selectProvider(el){
+  document.querySelectorAll('.provider-card').forEach(c=>c.classList.remove('selected'));
+  el.classList.add('selected');
+  showToast(el.querySelector('.provider-name').textContent+' selected ✓','success');
+}
+
+function saveSettings(){showToast('Settings saved ✓','success');}
+
+// ── TOAST ─────────────────────────────────────────────────────────
+function showToast(msg,type='info'){
+  const icons={success:'✅',error:'❌',info:'ℹ️'};
+  const t=document.createElement('div');
+  t.className='toast '+type;
+  t.innerHTML=`<span>${icons[type]}</span><span>${msg}</span>`;
+  document.getElementById('toastContainer').appendChild(t);
+  setTimeout(()=>{t.style.cssText='opacity:0;transform:translateX(20px);transition:all .3s';setTimeout(()=>t.remove(),300);},3000);
+}
+
+// ── INIT ──────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded',()=>{
+  updateCharCount();updatePreview();
+  renderContacts();renderTemplates();renderHistory();renderAnalytics();
+});
+
+document.querySelectorAll('.modal-overlay').forEach(o=>{
+  o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open');});
+});
+
+document.getElementById('senderName').addEventListener('input',updatePreview);
+</script>
+</body>
+</html>

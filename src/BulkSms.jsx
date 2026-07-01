@@ -1,0 +1,608 @@
+import { useState, useEffect } from 'react'
+import './BulkSms.css'
+
+const DEFAULT_CONTACTS = [
+  { id: 1, name: 'Kailash', phone: '+919876543210', group: 'VIP', status: 'active', selected: true },
+  { id: 2, name: 'John Doe', phone: '+1234567890', group: 'Leads', status: 'active', selected: true },
+  { id: 3, name: 'Alice Smith', phone: '+1987654321', group: 'VIP', status: 'active', selected: false },
+  { id: 4, name: 'Bob Johnson', phone: '+1122334455', group: 'General', status: 'active', selected: false }
+]
+
+const DEFAULT_TEMPLATES = [
+  { id: 1, name: 'Standard Reminder', content: 'Hi {name}, hope you are staying hydrated today! Log your water intake in Aqualama.' },
+  { id: 2, name: 'Premium Special offer', content: 'Hey {name}! Get 50% off Aqualama Premium this weekend only. Go to the Premium tab now!' },
+  { id: 3, name: 'Goal Streak Motivation', content: 'Stay strong {name}! You are close to hitting your daily water target today. Keep tracking!' }
+]
+
+export default function BulkSms() {
+  const [activeSubTab, setActiveSubTab] = useState('compose')
+  const [backendReady, setBackendReady] = useState(false)
+  const [backendError, setBackendError] = useState('')
+  const [senderStatus, setSenderStatus] = useState(null)
+
+  // Compose state
+  const [message, setMessage] = useState('')
+  const [senderName, setSenderName] = useState('Aqualama')
+  const [selectedContacts, setSelectedContacts] = useState([])
+  const [campaignName, setCampaignName] = useState('Hydration Push Campaign')
+
+  // Contacts state
+  const [contacts, setContacts] = useState([])
+
+  // Templates state
+  const [templates, setTemplates] = useState([])
+
+  // History state
+  const [history, setHistory] = useState([])
+
+  // Modal / Sending state
+  const [showSendModal, setShowSendModal] = useState(false)
+  const [sendingProgress, setSendingProgress] = useState(0)
+  const [isSending, setIsSending] = useState(false)
+  const [sendResult, setSendResult] = useState(null)
+
+  // Check Backend
+  useEffect(() => {
+    async function checkBackend() {
+      try {
+        const res = await fetch('http://localhost:5000/sender-status')
+        if (res.ok) {
+          const status = await res.json()
+          setSenderStatus(status)
+          setBackendReady(status.ready)
+          if (!status.ready) {
+            setBackendError('Twilio configuration is incomplete on server.')
+          }
+        } else {
+          setBackendReady(false)
+          setBackendError('Backend API responded with an error.')
+        }
+      } catch (err) {
+        setBackendReady(false)
+        setBackendError('Backend server on port 5000 is not running. Please start the backend.')
+      }
+    }
+    checkBackend()
+    fetchHistory()
+    fetchContacts()
+    fetchTemplates()
+  }, [])
+
+  const fetchHistory = async () => {
+    try {
+      const res = await fetch('http://localhost:5000/send-history')
+      if (res.ok) {
+        const data = await res.json()
+        setHistory(data)
+      }
+    } catch (err) {
+      console.error('Could not fetch history', err)
+    }
+  }
+
+  const fetchContacts = async () => {
+    try {
+      const res = await fetch('http://localhost:5000/contacts')
+      if (res.ok) {
+        const data = await res.json()
+        setContacts(data.map(c => ({
+          id: c.id,
+          name: c.name,
+          phone: c.phone,
+          group: c.group || c.grp || 'General',
+          status: c.status || 'active',
+          selected: true
+        })))
+      }
+    } catch (err) {
+      console.error('Could not fetch contacts', err)
+    }
+  }
+
+  const fetchTemplates = async () => {
+    try {
+      const res = await fetch('http://localhost:5000/templates')
+      if (res.ok) {
+        const data = await res.json()
+        setTemplates(data)
+      }
+    } catch (err) {
+      console.error('Could not fetch templates', err)
+    }
+  }
+
+  // Toggle single contact selection
+  const toggleContactSelection = (id) => {
+    setContacts(prev => prev.map(c => c.id === id ? { ...c, selected: !c.selected } : c))
+  }
+
+  // Select/Deselect all
+  const toggleSelectAll = (checked) => {
+    setContacts(prev => prev.map(c => ({ ...c, selected: checked })))
+  }
+
+  // Add Contact
+  const [showAddContact, setShowAddContact] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [newPhone, setNewPhone] = useState('')
+  const [newGroup, setNewGroup] = useState('General')
+
+  const handleAddContact = async () => {
+    if (!newName || !newPhone) return
+    const phoneNum = newPhone.startsWith('+') ? newPhone : `+${newPhone}`
+    try {
+      const res = await fetch('http://localhost:5000/contacts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newName,
+          phone: phoneNum,
+          grp: newGroup
+        })
+      })
+      if (res.ok) {
+        const added = await res.json()
+        setContacts(prev => [...prev, {
+          id: added.id,
+          name: added.name,
+          phone: added.phone,
+          group: added.grp || 'General',
+          status: 'active',
+          selected: true
+        }])
+        setNewName('')
+        setNewPhone('')
+        setShowAddContact(false)
+      } else {
+        const errData = await res.json()
+        alert(`Failed to save contact: ${errData.error || 'Server error'}`)
+      }
+    } catch (err) {
+      console.error(err)
+      alert(`Network error saving contact: ${err.message}`)
+    }
+  }
+
+  const handleDeleteContact = async (id) => {
+    try {
+      const res = await fetch(`http://localhost:5000/contacts/${id}`, { method: 'DELETE' })
+      if (res.ok) {
+        setContacts(prev => prev.filter(c => c.id !== id))
+      }
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  // templates
+  const useTemplate = (content) => {
+    setMessage(content)
+    setActiveSubTab('compose')
+  }
+
+  const deleteTemplate = async (id) => {
+    try {
+      const res = await fetch(`http://localhost:5000/templates/${id}`, { method: 'DELETE' })
+      if (res.ok) {
+        setTemplates(prev => prev.filter(t => t.id !== id))
+      }
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  const addTemplate = async () => {
+    const title = prompt('Template Name:')
+    const text = prompt('Template content (use {name} for variable):')
+    if (!title || !text) return
+    try {
+      const res = await fetch('http://localhost:5000/templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: title,
+          content: text
+        })
+      })
+      if (res.ok) {
+        const added = await res.json()
+        setTemplates(prev => [...prev, added])
+      }
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  // Get active recipients
+  const recipients = contacts.filter(c => c.selected).map(c => c.phone)
+
+  // Send campaign handler
+  const handleSendCampaign = async () => {
+    if (recipients.length === 0) {
+      alert('Please select at least one recipient.')
+      return
+    }
+    if (!message.trim()) {
+      alert('Please write a message.')
+      return
+    }
+
+    setIsSending(true)
+    setSendingProgress(10)
+    setShowSendModal(true)
+
+    try {
+      setSendingProgress(40)
+      const res = await fetch('http://localhost:5000/send-bulk-sms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recipients,
+          message,
+          senderName
+        })
+      })
+
+      setSendingProgress(80)
+      const results = await res.json()
+
+      if (!res.ok) {
+        throw new Error(results.error || 'Failed to send campaign.')
+      }
+
+      setSendingProgress(100)
+      const delivered = results.filter(r => r.success).length
+      const failed = results.filter(r => !r.success).length
+
+      setSendResult({
+        total: results.length,
+        delivered,
+        failed,
+        results
+      })
+      fetchHistory()
+    } catch (error) {
+      setSendResult({
+        error: error.message
+      })
+    } finally {
+      setIsSending(false)
+    }
+  }
+
+  const charLimit = 160
+  const totalSms = Math.ceil(message.length / charLimit) || 1
+
+  return (
+    <div className="bulk-sms-container">
+      <div className="sms-sidebar">
+        <button 
+          className={`sms-nav-item ${activeSubTab === 'compose' ? 'active' : ''}`}
+          onClick={() => setActiveSubTab('compose')}
+        >
+          ✍️ Compose
+        </button>
+        <button 
+          className={`sms-nav-item ${activeSubTab === 'contacts' ? 'active' : ''}`}
+          onClick={() => setActiveSubTab('contacts')}
+        >
+          👥 Contacts ({contacts.length})
+        </button>
+        <button 
+          className={`sms-nav-item ${activeSubTab === 'templates' ? 'active' : ''}`}
+          onClick={() => setActiveSubTab('templates')}
+        >
+          📋 Templates
+        </button>
+        <button 
+          className={`sms-nav-item ${activeSubTab === 'history' ? 'active' : ''}`}
+          onClick={() => setActiveSubTab('history')}
+        >
+          📊 History
+        </button>
+      </div>
+
+      <div className="sms-content">
+        {!backendReady && (
+          <div className="sms-warning-banner">
+            ⚠️ <b>API Warning:</b> {backendError || 'Express Backend API not detected. Bulk SMS sending will not work.'}
+            <br />
+            Make sure to start the backend running on port 5000 using <code>node server.js</code> inside the <code>sms-backend</code> folder.
+          </div>
+        )}
+
+        {activeSubTab === 'compose' && (
+          <div>
+            <h2 className="sms-page-title">Compose Bulk Message</h2>
+            <p className="sms-page-subtitle">Send promotional or alert messages to multiple user contacts simultaneously.</p>
+
+            <div className="sms-grid">
+              <div>
+                <div className="sms-card">
+                  <div className="sms-form-group">
+                    <label>Campaign Name</label>
+                    <input 
+                      type="text" 
+                      className="sms-input"
+                      value={campaignName}
+                      onChange={e => setCampaignName(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="sms-form-group">
+                    <label>Sender Name / ID</label>
+                    <input 
+                      type="text" 
+                      className="sms-input"
+                      value={senderName}
+                      onChange={e => setSenderName(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="sms-form-group">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <label>Message Content</label>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>
+                        {message.length} chars / {totalSms} SMS
+                      </span>
+                    </div>
+                    <textarea 
+                      className="sms-textarea"
+                      placeholder="Type your SMS message here. Use {name} for personalization."
+                      value={message}
+                      onChange={e => setMessage(e.target.value)}
+                    />
+                    <div style={{ marginTop: '8px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      <button className="sms-btn sms-btn-outline" style={{ padding: '4px 8px', fontSize: '0.75rem' }} onClick={() => setMessage(m => m + ' {name}')}>
+                        + Add {"{name}"}
+                      </button>
+                      <button className="sms-btn sms-btn-outline" style={{ padding: '4px 8px', fontSize: '0.75rem' }} onClick={() => setMessage('')}>
+                        Clear Message
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <button 
+                    className="sms-btn sms-btn-primary" 
+                    onClick={handleSendCampaign}
+                    disabled={!backendReady}
+                  >
+                    📤 Send Campaign to {recipients.length} Users
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <h3 style={{ margin: '0 0 12px 0', fontSize: '1rem', fontWeight: 800 }}>Phone Preview</h3>
+                <div className="sms-preview-phone">
+                  <div className="sms-preview-header">
+                    💬 {senderName || 'Sender'}
+                  </div>
+                  <div className="sms-preview-bubble">
+                    {message || 'Your SMS content preview will appear here.'}
+                  </div>
+                </div>
+
+                <div style={{ marginTop: '24px' }} className="sms-card">
+                  <h4 style={{ margin: '0 0 8px 0', fontSize: '0.9rem', fontWeight: 800 }}>Cost Summary</h4>
+                  <p style={{ margin: 0, fontSize: '0.85rem' }}>
+                    Recipients: <b>{recipients.length}</b>
+                    <br />
+                    SMS Parts: <b>{totalSms}</b>
+                    <br />
+                    Estimated Credits: <b>{recipients.length * totalSms}</b>
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeSubTab === 'contacts' && (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <div>
+                <h2 className="sms-page-title">Contact Management</h2>
+                <p className="sms-page-subtitle">Manage phone lists for bulk SMS campaigns.</p>
+              </div>
+              <button className="sms-btn sms-btn-primary" onClick={() => setShowAddContact(true)}>
+                ➕ Add Contact
+              </button>
+            </div>
+
+            {showAddContact && (
+              <div className="sms-card" style={{ background: 'var(--soft)', border: '1.5px solid var(--brand)' }}>
+                <h3 style={{ margin: '0 0 12px 0', fontSize: '1rem' }}>New Contact Details</h3>
+                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                  <input 
+                    type="text" 
+                    placeholder="Name" 
+                    className="sms-input" 
+                    style={{ flex: 1 }}
+                    value={newName} 
+                    onChange={e => setNewName(e.target.value)} 
+                  />
+                  <input 
+                    type="tel" 
+                    placeholder="Phone number (+E.164)" 
+                    className="sms-input" 
+                    style={{ flex: 1 }}
+                    value={newPhone} 
+                    onChange={e => setNewPhone(e.target.value)} 
+                  />
+                  <select 
+                    className="sms-select" 
+                    style={{ width: '120px' }}
+                    value={newGroup}
+                    onChange={e => setNewGroup(e.target.value)}
+                  >
+                    <option value="General">General</option>
+                    <option value="VIP">VIP</option>
+                    <option value="Leads">Leads</option>
+                  </select>
+                  <button className="sms-btn sms-btn-primary" onClick={handleAddContact}>Save</button>
+                  <button className="sms-btn sms-btn-outline" onClick={() => setShowAddContact(false)}>Cancel</button>
+                </div>
+              </div>
+            )}
+
+            <table className="sms-table">
+              <thead>
+                <tr>
+                  <th style={{ width: '40px' }}>
+                    <input 
+                      type="checkbox" 
+                      checked={contacts.length > 0 && contacts.every(c => c.selected)}
+                      onChange={e => toggleSelectAll(e.target.checked)}
+                    />
+                  </th>
+                  <th>Name</th>
+                  <th>Phone</th>
+                  <th>Group</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {contacts.map(c => (
+                  <tr key={c.id}>
+                    <td>
+                      <input 
+                        type="checkbox" 
+                        checked={c.selected}
+                        onChange={() => toggleContactSelection(c.id)}
+                      />
+                    </td>
+                    <td><b>{c.name}</b></td>
+                    <td><code>{c.phone}</code></td>
+                    <td>
+                      <span className={`sms-tag ${c.group.toLowerCase()}`}>{c.group}</span>
+                    </td>
+                    <td>
+                      <span className="sms-tag active">{c.status}</span>
+                    </td>
+                    <td>
+                      <button className="sms-btn sms-btn-danger" style={{ padding: '4px 8px', fontSize: '0.8rem' }} onClick={() => handleDeleteContact(c.id)}>
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {activeSubTab === 'templates' && (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <div>
+                <h2 className="sms-page-title">Message Templates</h2>
+                <p className="sms-page-subtitle">Save text structures for reusable campaign creation.</p>
+              </div>
+              <button className="sms-btn sms-btn-primary" onClick={addTemplate}>
+                ➕ Create Template
+              </button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+              {templates.map(t => (
+                <div className="sms-card" key={t.id}>
+                  <h3 style={{ margin: '0 0 8px 0', fontSize: '1.05rem', fontWeight: 800 }}>📝 {t.name}</h3>
+                  <p style={{ margin: '0 0 16px 0', fontSize: '0.85rem', color: 'var(--muted)', background: 'var(--soft)', padding: '10px', borderRadius: '8px' }}>
+                    {t.content}
+                  </p>
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <button className="sms-btn sms-btn-primary" style={{ padding: '6px 12px', fontSize: '0.8rem' }} onClick={() => useTemplate(t.content)}>
+                      Use Template
+                    </button>
+                    <button className="sms-btn sms-btn-danger" style={{ padding: '6px 12px', fontSize: '0.8rem' }} onClick={() => deleteTemplate(t.id)}>
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {activeSubTab === 'history' && (
+          <div>
+            <h2 className="sms-page-title">Campaign History</h2>
+            <p className="sms-page-subtitle">Track sent campaigns and delivery analytics.</p>
+
+            {history.length === 0 ? (
+              <p style={{ textAlign: 'center', color: 'var(--muted)', padding: '40px' }}>No campaigns have been sent yet.</p>
+            ) : (
+              <div>
+                {history.map((h, i) => (
+                  <div className="sms-history-item" key={i}>
+                    <div className="sms-history-info">
+                      <div className="sms-history-meta">
+                        <span style={{ fontWeight: 800, color: 'var(--brand-strong)' }}>{h.name || 'Campaign'}</span>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>{new Date(h.timestamp || Date.now()).toLocaleString()}</span>
+                      </div>
+                      <span className="sms-history-text">{h.preview || h.message}</span>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <span className="sms-tag active" style={{ display: 'block', marginBottom: '4px' }}>
+                        Delivered: {h.delivered || h.sent}
+                      </span>
+                      {h.failed > 0 && (
+                        <span className="sms-tag vip" style={{ display: 'block' }}>
+                          Failed: {h.failed}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {showSendModal && (
+        <div className="sms-modal-overlay">
+          <div className="sms-modal">
+            <h3 className="sms-modal-title">Sending Bulk Campaign</h3>
+            {isSending ? (
+              <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                <p>Sending messages via Twilio Edge Server...</p>
+                <div style={{ background: 'var(--line)', height: '8px', borderRadius: '4px', overflow: 'hidden', marginTop: '12px' }}>
+                  <div style={{ background: 'var(--brand)', height: '100%', width: `${sendingProgress}%`, transition: 'width 0.3s ease' }}></div>
+                </div>
+              </div>
+            ) : (
+              <div>
+                {sendResult?.error ? (
+                  <div style={{ color: '#dc2626', fontWeight: 700 }}>
+                    ❌ Error: {sendResult.error}
+                  </div>
+                ) : (
+                  <div>
+                    <p style={{ fontWeight: 700, color: '#167b58', marginBottom: '12px' }}>
+                      ✅ Campaign Sent Successfully!
+                    </p>
+                    <p style={{ fontSize: '0.9rem', color: 'var(--muted)' }}>
+                      Total Sent: <b>{sendResult?.total}</b>
+                      <br />
+                      Delivered: <b>{sendResult?.delivered}</b>
+                      <br />
+                      Failed: <b>{sendResult?.failed}</b>
+                    </p>
+                  </div>
+                )}
+                <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end' }}>
+                  <button className="sms-btn sms-btn-primary" onClick={() => setShowSendModal(false)}>Close</button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
