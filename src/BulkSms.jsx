@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { sendBulkSmsViaEdge, supabaseReady } from './supabaseClient'
+import { sendBulkSmsViaEdge, dbReady } from './mysqlClient'
 import './BulkSms.css'
 
 const DEFAULT_CONTACTS = [
@@ -69,31 +69,26 @@ export default function BulkSms() {
   const [isSending, setIsSending] = useState(false)
   const [sendResult, setSendResult] = useState(null)
 
-  // Check backend (Supabase Edge Function) on mount
+  // Check MySQL backend on mount
   useEffect(() => {
     async function checkBackend() {
-      if (!supabaseReady) {
-        setBackendReady(false)
-        setBackendError('Supabase not configured. Bulk SMS requires Supabase Edge Functions.')
-        return
-      }
       try {
-        // Test if the send-bulk-sms edge function is deployed
-        const result = await sendBulkSmsViaEdge({
-          recipients: ['+15551234567'],
-          message: 'Test',
-          senderName: 'Test',
+        // Test if the MySQL backend is running
+        const res = await fetch('http://localhost:5000/wl/load-profile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: null }),
         })
-        if (result.notDeployed) {
-          setBackendReady(false)
-          setBackendError('Supabase Edge Function "send-bulk-sms" not deployed. Deploy it to enable Bulk SMS.')
-        } else {
+        if (res.ok) {
           setBackendReady(true)
           setBackendError('')
+        } else {
+          setBackendReady(false)
+          setBackendError('MySQL backend not responding. Start the backend server (cd sms-backend && npm start).')
         }
       } catch (err) {
         setBackendReady(false)
-        setBackendError('Failed to connect to Supabase Edge Function.')
+        setBackendError('MySQL backend not running. Start the backend server (cd sms-backend && npm start).')
       }
     }
     checkBackend()
@@ -175,7 +170,7 @@ export default function BulkSms() {
   // Get active recipients
   const recipients = contacts.filter(c => c.selected).map(c => c.phone)
 
-  // Send campaign handler - uses Supabase Edge Function
+  // Send campaign handler - uses MySQL backend (phpMyAdmin)
   const handleSendCampaign = async () => {
     if (recipients.length === 0) {
       alert('Please select at least one recipient.')
@@ -186,8 +181,8 @@ export default function BulkSms() {
       return
     }
 
-    if (!supabaseReady) {
-      alert('Supabase not configured. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY environment variables.')
+    if (!backendReady) {
+      alert('MySQL backend not running. Please start the backend server (cd sms-backend && npm start).')
       return
     }
 
@@ -207,7 +202,7 @@ export default function BulkSms() {
         }
       })
 
-      // Use the bulk SMS edge function
+      // Use the bulk SMS backend API
       const result = await sendBulkSmsViaEdge({
         recipients: personalizedRecipients.map(r => r.phone),
         message,
@@ -240,7 +235,7 @@ export default function BulkSms() {
         delivered,
         failed,
         date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-        provider: 'Twilio (via Supabase Edge Function)',
+        provider: 'Twilio (via MySQL backend)',
         timestamp: new Date().toISOString(),
       }
       setHistory(prev => [newHistoryEntry, ...prev].slice(0, 100))
@@ -289,11 +284,11 @@ export default function BulkSms() {
       <div className="sms-content">
         {!backendReady && (
           <div className="sms-warning-banner">
-            ⚠️ <b>API Notice:</b> {backendError || 'Supabase Edge Function not configured. Bulk SMS sending requires deployed Edge Function.'}
+            ⚠️ <b>API Notice:</b> {backendError || 'MySQL backend not configured. Bulk SMS requires the backend server running.'}
             <br />
             <small>
-              This feature uses Supabase Edge Functions (not a local backend).
-              Deploy the <code>send-reminder</code> Edge Function in your Supabase project to enable SMS sending.
+              This feature uses the MySQL backend (phpMyAdmin database) via local Express server on port 5000.
+              Start the backend: <code>cd sms-backend && npm start</code>
             </small>
           </div>
         )}
@@ -557,7 +552,7 @@ export default function BulkSms() {
             <h3 className="sms-modal-title">Sending Bulk Campaign</h3>
             {isSending ? (
               <div style={{ textAlign: 'center', padding: '20px 0' }}>
-                <p>Sending messages via Supabase Edge Function → Twilio...</p>
+                <p>Sending messages via MySQL backend → Twilio...</p>
                 <div style={{ background: 'var(--line)', height: '8px', borderRadius: '4px', overflow: 'hidden', marginTop: '12px' }}>
                   <div style={{ background: 'var(--brand)', height: '100%', width: `${sendingProgress}%`, transition: 'width 0.3s ease' }}></div>
                 </div>

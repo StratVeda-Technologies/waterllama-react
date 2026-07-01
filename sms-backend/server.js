@@ -201,6 +201,44 @@ function buildMessageOptions(phone, message) {
 
 // ── WATERLLAMA ROUTES ─────────────────────────────────────────────
 
+// Check MySQL database tables (for phpMyAdmin setup)
+app.get('/wl/check-tables', async (req, res) => {
+  try {
+    if (!wlPool) {
+      return res.json({ ok: false, notConfigured: true, tables: [] });
+    }
+
+    const tableNames = [
+      { key: 'users', label: 'Users' },
+      { key: 'water_entries', label: 'Water Entries' },
+      { key: 'goals', label: 'Goals' },
+      { key: 'subscriptions', label: 'Subscriptions' },
+      { key: 'reminder_logs', label: 'Reminder Logs' },
+    ];
+
+    const results = await Promise.all(
+      tableNames.map(async ({ key, label }) => {
+        try {
+          await wlPool.execute(`SELECT 1 FROM \`${key}\` LIMIT 1`);
+          return { name: key, label, exists: true, errorCode: null };
+        } catch (error) {
+          // MySQL error code 1146 = table doesn't exist
+          const exists = error.code !== 'ER_NO_SUCH_TABLE' && error.errno !== 1146;
+          return { name: key, label, exists, errorCode: error.code ?? null };
+        }
+      }),
+    );
+
+    res.json({
+      ok: results.every((t) => t.exists),
+      tables: results,
+    });
+  } catch (err) {
+    console.error('Check tables error:', err);
+    res.status(500).json({ ok: false, error: err.message, tables: [] });
+  }
+});
+
 // Load full user profile (or create if new)
 app.post('/wl/load-profile', async (req, res) => {
   try {

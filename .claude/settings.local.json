@@ -22,7 +22,17 @@
       "Bash(curl -s \"https://stratveda-technologies.github.io/waterllama-react/assets/index-BCseFcjq.js\")",
       "Bash(curl -s \"https://stratveda-technologies.github.io/waterllama-react/assets/index-Dx9fEJLp.js\")",
       "Bash(curl -s \"https://stratveda-technologies.github.io/waterllama-react/assets/index-CNAGUKhB.css\")",
-      "PowerShell(npm run *)"
+      "PowerShell(npm run *)",
+      "Bash(npm install *)",
+      "Bash(npm start *)",
+      "Bash(timeout 5 node server.js)",
+      "Bash(timeout 3 node server.js)",
+      "Bash(curl -s http://localhost:5000/wl/check-tables)",
+      "Bash(timeout 10 node server.js)",
+      "Bash(npm --version)",
+      "Bash(mysql *)",
+      "PowerShell(& \"C:\\\\Program Files\\\\MySQL\\\\MySQL Server 8.0\\\\bin\\\\mysql.exe\" -u root -p\"\" -e \"SHOW DATABASES;\")",
+      "Bash(curl *)"
     ]
   }
 }

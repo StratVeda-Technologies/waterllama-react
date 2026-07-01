@@ -8,10 +8,7 @@
 const API = 'http://localhost:5000';
 
 // Backend is always ready (MySQL via Express server)
-export const supabaseReady = true;
-
-// No-op stub for supabase so App.jsx imports don't break
-export const supabase = null;
+export const dbReady = true;
 
 // ── Helpers ────────────────────────────────────────────────────────
 async function post(path, body) {
@@ -131,4 +128,24 @@ export async function syncWaterEntriesToDB({ userId, logs, drinkFactors }) {
   )
 
   return { synced, skipped: logs.length - localOnly.length, failed, errors }
+}
+
+/**
+ * Send bulk SMS via MySQL backend API.
+ * Calls /send-bulk-sms endpoint which uses Twilio and saves to sms_sender database.
+ * Returns { ok: boolean, results?: Array<{ phone, success, sid?, error? }>, error?: string }
+ */
+export async function sendBulkSmsViaEdge({ recipients, message, senderName }) {
+  try {
+    const data = await post('/send-bulk-sms', {
+      recipients,
+      message,
+      senderName,
+    })
+
+    // The backend returns an array of results
+    return { ok: true, results: data }
+  } catch (err) {
+    return { ok: false, error: err.message }
+  }
 }

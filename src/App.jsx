@@ -7,10 +7,9 @@ import {
   logRemoteReminder,
   saveRemoteProfile,
   sendReminderViaEdge,
-  supabase,
-  supabaseReady,
+  dbReady,
   syncWaterEntriesToDB,
-} from './supabaseClient'
+} from './mysqlClient'
 import './App.css'
 import BulkSms from './BulkSms'
 
@@ -151,7 +150,7 @@ function App() {
   const [userId, setUserId] = useState(stored?.userId ?? '')
   const [remoteLoaded, setRemoteLoaded] = useState(false)
   const [syncStatus, setSyncStatus] = useState(
-    supabaseReady ? 'Connecting to database...' : 'Local mode',
+    dbReady ? 'Connecting to database...' : 'Local mode',
   )
   // Auto-reminder state
   const [autoSendStatus, setAutoSendStatus] = useState('idle') // idle | sending | sent | error
@@ -240,7 +239,7 @@ function App() {
     let cancelled = false
 
     async function loadDatabase() {
-      if (!supabaseReady) {
+      if (!dbReady) {
         setRemoteLoaded(true)
         return
       }
@@ -276,49 +275,11 @@ function App() {
     }
   }, [])
 
-  // ── Realtime subscription listener for paid premium validation ──
-  useEffect(() => {
-    if (!supabase || !supabaseReady || !userId) {
-      return
-    }
-
-    console.log('Registering realtime postgres_changes listener for public.subscriptions on user:', userId)
-    const channel = supabase
-      .channel(`public:subscriptions:user:${userId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'subscriptions',
-          filter: `user_id=eq.${userId}`,
-        },
-        (payload) => {
-          console.log('Realtime postgres_changes event on subscriptions:', payload)
-          if (payload.eventType === 'DELETE') {
-            setIsPremium(false)
-            setPremiumPlan('Free')
-            setPremiumExpiry(null)
-          } else {
-            const sub = payload.new
-            if (sub) {
-              const active = sub.status === 'active' && (sub.plan === 'Monthly' || sub.plan === 'Yearly')
-              setIsPremium(active)
-              setPremiumPlan(sub.plan)
-              setPremiumExpiry(sub.expires_at || null)
-            }
-          }
-        }
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [userId])
+  // Note: MySQL backend doesn't support realtime subscriptions like Supabase.
+  // Premium status is synced via regular profile save/load operations.
 
   useEffect(() => {
-    if (!supabaseReady || !remoteLoaded || !userId) {
+    if (!dbReady || !remoteLoaded || !userId) {
       return
     }
 
@@ -366,7 +327,7 @@ function App() {
     const entry = { id: Date.now(), amount: Number(size), time, type: drinkType, date: todayKey }
     setLogs((current) => [entry, ...current])
 
-    if (!supabaseReady || !userId) {
+    if (!dbReady || !userId) {
       return
     }
 
@@ -390,7 +351,7 @@ function App() {
 
   async function resetDay() {
     setLogs([])
-    if (!supabaseReady || !userId) {
+    if (!dbReady || !userId) {
       return
     }
 
@@ -538,7 +499,7 @@ function App() {
     const expiryStr = expiry.toISOString()
     setPremiumExpiry(expiryStr)
 
-    if (!supabaseReady || !userId) return
+    if (!dbReady || !userId) return
 
     try {
       await saveRemoteProfile({
@@ -566,7 +527,7 @@ function App() {
     setPremiumPlan('Free')
     setPremiumExpiry(null)
 
-    if (!supabaseReady || !userId) return
+    if (!dbReady || !userId) return
 
     try {
       await saveRemoteProfile({
@@ -1019,7 +980,7 @@ function App() {
                   id="btn-sync-water"
                   className="primary-action"
                   type="button"
-                  disabled={syncPending || !supabaseReady || !userId}
+                  disabled={syncPending || !dbReady || !userId}
                   style={{ background: 'var(--brand)' }}
                   onClick={async () => {
                     setSyncPending(true)
