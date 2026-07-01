@@ -11,7 +11,10 @@
       "Bash(git checkout *)",
       "Bash(git filter-branch *)",
       "Read(//c/Users/waterllama working/**)",
-      "Bash(rm -rf waterllama-react/.git)"
+      "Bash(rm -rf waterllama-react/.git)",
+      "Bash(git branch *)",
+      "Bash(ren dist\\\\sms-dashboard.html index.html)",
+      "Bash(npm run *)"
     ]
   }
 }
