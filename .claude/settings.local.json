@@ -19,7 +19,10 @@
       "Bash(curl -s \"https://stratveda-technologies.github.io/waterllama-react/\")",
       "Bash(gh api *)",
       "Bash(gh workflow *)",
-      "Bash(curl -s \"https://stratveda-technologies.github.io/waterllama-react/assets/index-BCseFcjq.js\")"
+      "Bash(curl -s \"https://stratveda-technologies.github.io/waterllama-react/assets/index-BCseFcjq.js\")",
+      "Bash(curl -s \"https://stratveda-technologies.github.io/waterllama-react/assets/index-Dx9fEJLp.js\")",
+      "Bash(curl -s \"https://stratveda-technologies.github.io/waterllama-react/assets/index-CNAGUKhB.css\")",
+      "PowerShell(npm run *)"
     ]
   }
 }

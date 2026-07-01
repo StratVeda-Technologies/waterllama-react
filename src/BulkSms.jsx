@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { sendBulkSmsViaEdge, supabaseReady } from './supabaseClient'
 import './BulkSms.css'
 
 const DEFAULT_CONTACTS = [
@@ -14,6 +15,33 @@ const DEFAULT_TEMPLATES = [
   { id: 3, name: 'Goal Streak Motivation', content: 'Stay strong {name}! You are close to hitting your daily water target today. Keep tracking!' }
 ]
 
+const STORAGE_KEYS = {
+  contacts: 'blastSms.contacts',
+  templates: 'blastSms.templates',
+  history: 'blastSms.history',
+}
+
+function loadStoredData(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key)
+    return raw ? JSON.parse(raw) : fallback
+  } catch (error) {
+    return fallback
+  }
+}
+
+function saveStoredData(key, data) {
+  localStorage.setItem(key, JSON.stringify(data))
+}
+
+function normalizePhone(value) {
+  return String(value || '').trim().replace(/[^\d+]/g, '')
+}
+
+function isValidPhone(value) {
+  return /^\+\d{10,15}$/.test(value || '')
+}
+
 export default function BulkSms() {
   const [activeSubTab, setActiveSubTab] = useState('compose')
   const [backendReady, setBackendReady] = useState(false)
@@ -27,13 +55,13 @@ export default function BulkSms() {
   const [campaignName, setCampaignName] = useState('Hydration Push Campaign')
 
   // Contacts state
-  const [contacts, setContacts] = useState([])
+  const [contacts, setContacts] = useState(() => loadStoredData(STORAGE_KEYS.contacts, DEFAULT_CONTACTS))
 
   // Templates state
-  const [templates, setTemplates] = useState([])
+  const [templates, setTemplates] = useState(() => loadStoredData(STORAGE_KEYS.templates, DEFAULT_TEMPLATES))
 
   // History state
-  const [history, setHistory] = useState([])
+  const [history, setHistory] = useState(() => loadStoredData(STORAGE_KEYS.history, []))
 
   // Modal / Sending state
   const [showSendModal, setShowSendModal] = useState(false)
@@ -41,75 +69,50 @@ export default function BulkSms() {
   const [isSending, setIsSending] = useState(false)
   const [sendResult, setSendResult] = useState(null)
 
-  // Check Backend
+  // Check backend (Supabase Edge Function) on mount
   useEffect(() => {
     async function checkBackend() {
+      if (!supabaseReady) {
+        setBackendReady(false)
+        setBackendError('Supabase not configured. Bulk SMS requires Supabase Edge Functions.')
+        return
+      }
       try {
-        const res = await fetch('http://localhost:5000/sender-status')
-        if (res.ok) {
-          const status = await res.json()
-          setSenderStatus(status)
-          setBackendReady(status.ready)
-          if (!status.ready) {
-            setBackendError('Twilio configuration is incomplete on server.')
-          }
-        } else {
+        // Test if the send-bulk-sms edge function is deployed
+        const result = await sendBulkSmsViaEdge({
+          recipients: ['+15551234567'],
+          message: 'Test',
+          senderName: 'Test',
+        })
+        if (result.notDeployed) {
           setBackendReady(false)
-          setBackendError('Backend API responded with an error.')
+          setBackendError('Supabase Edge Function "send-bulk-sms" not deployed. Deploy it to enable Bulk SMS.')
+        } else {
+          setBackendReady(true)
+          setBackendError('')
         }
       } catch (err) {
         setBackendReady(false)
-        setBackendError('Backend server on port 5000 is not running. Please start the backend.')
+        setBackendError('Failed to connect to Supabase Edge Function.')
       }
     }
     checkBackend()
-    fetchHistory()
-    fetchContacts()
-    fetchTemplates()
   }, [])
 
-  const fetchHistory = async () => {
-    try {
-      const res = await fetch('http://localhost:5000/send-history')
-      if (res.ok) {
-        const data = await res.json()
-        setHistory(data)
-      }
-    } catch (err) {
-      console.error('Could not fetch history', err)
-    }
-  }
+  // Save contacts to localStorage
+  useEffect(() => {
+    saveStoredData(STORAGE_KEYS.contacts, contacts)
+  }, [contacts])
 
-  const fetchContacts = async () => {
-    try {
-      const res = await fetch('http://localhost:5000/contacts')
-      if (res.ok) {
-        const data = await res.json()
-        setContacts(data.map(c => ({
-          id: c.id,
-          name: c.name,
-          phone: c.phone,
-          group: c.group || c.grp || 'General',
-          status: c.status || 'active',
-          selected: true
-        })))
-      }
-    } catch (err) {
-      console.error('Could not fetch contacts', err)
-    }
-  }
+  // Save templates to localStorage
+  useEffect(() => {
+    saveStoredData(STORAGE_KEYS.templates, templates)
+  }, [templates])
 
-  const fetchTemplates = async () => {
-    try {
-      const res = await fetch('http://localhost:5000/templates')
-      if (res.ok) {
-        const data = await res.json()
-        setTemplates(data)
-      }
-    } catch (err) {
-      console.error('Could not fetch templates', err)
-    }
-  }
+  // Save history to localStorage
+  useEffect(() => {
+    saveStoredData(STORAGE_KEYS.history, history)
+  }, [history])
 
   // Toggle single contact selection
   const toggleContactSelection = (id) => {
@@ -127,51 +130,29 @@ export default function BulkSms() {
   const [newPhone, setNewPhone] = useState('')
   const [newGroup, setNewGroup] = useState('General')
 
-  const handleAddContact = async () => {
+  const handleAddContact = () => {
     if (!newName || !newPhone) return
     const phoneNum = newPhone.startsWith('+') ? newPhone : `+${newPhone}`
-    try {
-      const res = await fetch('http://localhost:5000/contacts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: newName,
-          phone: phoneNum,
-          grp: newGroup
-        })
-      })
-      if (res.ok) {
-        const added = await res.json()
-        setContacts(prev => [...prev, {
-          id: added.id,
-          name: added.name,
-          phone: added.phone,
-          group: added.grp || 'General',
-          status: 'active',
-          selected: true
-        }])
-        setNewName('')
-        setNewPhone('')
-        setShowAddContact(false)
-      } else {
-        const errData = await res.json()
-        alert(`Failed to save contact: ${errData.error || 'Server error'}`)
-      }
-    } catch (err) {
-      console.error(err)
-      alert(`Network error saving contact: ${err.message}`)
+    if (!isValidPhone(phoneNum)) {
+      alert('Please enter a valid E.164 phone number (e.g., +919876543210)')
+      return
     }
+    const newContact = {
+      id: Date.now(),
+      name: newName,
+      phone: phoneNum,
+      group: newGroup,
+      status: 'active',
+      selected: true
+    }
+    setContacts(prev => [...prev, newContact])
+    setNewName('')
+    setNewPhone('')
+    setShowAddContact(false)
   }
 
-  const handleDeleteContact = async (id) => {
-    try {
-      const res = await fetch(`http://localhost:5000/contacts/${id}`, { method: 'DELETE' })
-      if (res.ok) {
-        setContacts(prev => prev.filter(c => c.id !== id))
-      }
-    } catch (err) {
-      console.error(err)
-    }
+  const handleDeleteContact = (id) => {
+    setContacts(prev => prev.filter(c => c.id !== id))
   }
 
   // templates
@@ -180,43 +161,21 @@ export default function BulkSms() {
     setActiveSubTab('compose')
   }
 
-  const deleteTemplate = async (id) => {
-    try {
-      const res = await fetch(`http://localhost:5000/templates/${id}`, { method: 'DELETE' })
-      if (res.ok) {
-        setTemplates(prev => prev.filter(t => t.id !== id))
-      }
-    } catch (err) {
-      console.error(err)
-    }
+  const deleteTemplate = (id) => {
+    setTemplates(prev => prev.filter(t => t.id !== id))
   }
 
-  const addTemplate = async () => {
+  const addTemplate = () => {
     const title = prompt('Template Name:')
     const text = prompt('Template content (use {name} for variable):')
     if (!title || !text) return
-    try {
-      const res = await fetch('http://localhost:5000/templates', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: title,
-          content: text
-        })
-      })
-      if (res.ok) {
-        const added = await res.json()
-        setTemplates(prev => [...prev, added])
-      }
-    } catch (err) {
-      console.error(err)
-    }
+    setTemplates(prev => [...prev, { id: Date.now(), name: title, content: text }])
   }
 
   // Get active recipients
   const recipients = contacts.filter(c => c.selected).map(c => c.phone)
 
-  // Send campaign handler
+  // Send campaign handler - uses Supabase Edge Function
   const handleSendCampaign = async () => {
     if (recipients.length === 0) {
       alert('Please select at least one recipient.')
@@ -227,40 +186,65 @@ export default function BulkSms() {
       return
     }
 
+    if (!supabaseReady) {
+      alert('Supabase not configured. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY environment variables.')
+      return
+    }
+
     setIsSending(true)
     setSendingProgress(10)
     setShowSendModal(true)
 
     try {
-      setSendingProgress(40)
-      const res = await fetch('http://localhost:5000/send-bulk-sms', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          recipients,
-          message,
-          senderName
-        })
+      setSendingProgress(30)
+
+      // Personalize message for each recipient
+      const personalizedRecipients = recipients.map(phone => {
+        const contact = contacts.find(c => c.phone === phone)
+        return {
+          phone,
+          message: message.replace(/{name}/g, contact?.name || 'there'),
+        }
+      })
+
+      // Use the bulk SMS edge function
+      const result = await sendBulkSmsViaEdge({
+        recipients: personalizedRecipients.map(r => r.phone),
+        message,
+        senderName,
       })
 
       setSendingProgress(80)
-      const results = await res.json()
 
-      if (!res.ok) {
-        throw new Error(results.error || 'Failed to send campaign.')
+      if (!result.ok) {
+        throw new Error(result.error || 'Failed to send bulk SMS')
       }
 
       setSendingProgress(100)
-      const delivered = results.filter(r => r.success).length
-      const failed = results.filter(r => !r.success).length
+      const delivered = result.results?.filter(r => r.success).length ?? 0
+      const failed = result.results?.filter(r => !r.success).length ?? 0
 
       setSendResult({
-        total: results.length,
+        total: result.results?.length ?? 0,
         delivered,
         failed,
-        results
+        results: result.results ?? [],
       })
-      fetchHistory()
+
+      // Save to history
+      const newHistoryEntry = {
+        id: Date.now(),
+        name: campaignName || `Campaign — ${new Date().toLocaleDateString()}`,
+        preview: message.substring(0, 50) + (message.length > 50 ? '…' : ''),
+        sent: result.results?.length ?? 0,
+        delivered,
+        failed,
+        date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+        provider: 'Twilio (via Supabase Edge Function)',
+        timestamp: new Date().toISOString(),
+      }
+      setHistory(prev => [newHistoryEntry, ...prev].slice(0, 100))
+
     } catch (error) {
       setSendResult({
         error: error.message
@@ -276,25 +260,25 @@ export default function BulkSms() {
   return (
     <div className="bulk-sms-container">
       <div className="sms-sidebar">
-        <button 
+        <button
           className={`sms-nav-item ${activeSubTab === 'compose' ? 'active' : ''}`}
           onClick={() => setActiveSubTab('compose')}
         >
           ✍️ Compose
         </button>
-        <button 
+        <button
           className={`sms-nav-item ${activeSubTab === 'contacts' ? 'active' : ''}`}
           onClick={() => setActiveSubTab('contacts')}
         >
           👥 Contacts ({contacts.length})
         </button>
-        <button 
+        <button
           className={`sms-nav-item ${activeSubTab === 'templates' ? 'active' : ''}`}
           onClick={() => setActiveSubTab('templates')}
         >
           📋 Templates
         </button>
-        <button 
+        <button
           className={`sms-nav-item ${activeSubTab === 'history' ? 'active' : ''}`}
           onClick={() => setActiveSubTab('history')}
         >
@@ -305,9 +289,12 @@ export default function BulkSms() {
       <div className="sms-content">
         {!backendReady && (
           <div className="sms-warning-banner">
-            ⚠️ <b>API Warning:</b> {backendError || 'Express Backend API not detected. Bulk SMS sending will not work.'}
+            ⚠️ <b>API Notice:</b> {backendError || 'Supabase Edge Function not configured. Bulk SMS sending requires deployed Edge Function.'}
             <br />
-            Make sure to start the backend running on port 5000 using <code>node server.js</code> inside the <code>sms-backend</code> folder.
+            <small>
+              This feature uses Supabase Edge Functions (not a local backend).
+              Deploy the <code>send-reminder</code> Edge Function in your Supabase project to enable SMS sending.
+            </small>
           </div>
         )}
 
@@ -321,8 +308,8 @@ export default function BulkSms() {
                 <div className="sms-card">
                   <div className="sms-form-group">
                     <label>Campaign Name</label>
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       className="sms-input"
                       value={campaignName}
                       onChange={e => setCampaignName(e.target.value)}
@@ -331,8 +318,8 @@ export default function BulkSms() {
 
                   <div className="sms-form-group">
                     <label>Sender Name / ID</label>
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       className="sms-input"
                       value={senderName}
                       onChange={e => setSenderName(e.target.value)}
@@ -346,7 +333,7 @@ export default function BulkSms() {
                         {message.length} chars / {totalSms} SMS
                       </span>
                     </div>
-                    <textarea 
+                    <textarea
                       className="sms-textarea"
                       placeholder="Type your SMS message here. Use {name} for personalization."
                       value={message}
@@ -364,12 +351,12 @@ export default function BulkSms() {
                 </div>
 
                 <div style={{ display: 'flex', gap: '12px' }}>
-                  <button 
-                    className="sms-btn sms-btn-primary" 
+                  <button
+                    className="sms-btn sms-btn-primary"
                     onClick={handleSendCampaign}
-                    disabled={!backendReady}
+                    disabled={!backendReady || isSending}
                   >
-                    📤 Send Campaign to {recipients.length} Users
+                    {isSending ? '📤 Sending...' : `📤 Send Campaign to ${recipients.length} Users`}
                   </button>
                 </div>
               </div>
@@ -416,24 +403,24 @@ export default function BulkSms() {
               <div className="sms-card" style={{ background: 'var(--soft)', border: '1.5px solid var(--brand)' }}>
                 <h3 style={{ margin: '0 0 12px 0', fontSize: '1rem' }}>New Contact Details</h3>
                 <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                  <input 
-                    type="text" 
-                    placeholder="Name" 
-                    className="sms-input" 
+                  <input
+                    type="text"
+                    placeholder="Name"
+                    className="sms-input"
                     style={{ flex: 1 }}
-                    value={newName} 
-                    onChange={e => setNewName(e.target.value)} 
+                    value={newName}
+                    onChange={e => setNewName(e.target.value)}
                   />
-                  <input 
-                    type="tel" 
-                    placeholder="Phone number (+E.164)" 
-                    className="sms-input" 
+                  <input
+                    type="tel"
+                    placeholder="Phone number (+E.164)"
+                    className="sms-input"
                     style={{ flex: 1 }}
-                    value={newPhone} 
-                    onChange={e => setNewPhone(e.target.value)} 
+                    value={newPhone}
+                    onChange={e => setNewPhone(e.target.value)}
                   />
-                  <select 
-                    className="sms-select" 
+                  <select
+                    className="sms-select"
                     style={{ width: '120px' }}
                     value={newGroup}
                     onChange={e => setNewGroup(e.target.value)}
@@ -452,8 +439,8 @@ export default function BulkSms() {
               <thead>
                 <tr>
                   <th style={{ width: '40px' }}>
-                    <input 
-                      type="checkbox" 
+                    <input
+                      type="checkbox"
                       checked={contacts.length > 0 && contacts.every(c => c.selected)}
                       onChange={e => toggleSelectAll(e.target.checked)}
                     />
@@ -469,8 +456,8 @@ export default function BulkSms() {
                 {contacts.map(c => (
                   <tr key={c.id}>
                     <td>
-                      <input 
-                        type="checkbox" 
+                      <input
+                        type="checkbox"
                         checked={c.selected}
                         onChange={() => toggleContactSelection(c.id)}
                       />
@@ -570,7 +557,7 @@ export default function BulkSms() {
             <h3 className="sms-modal-title">Sending Bulk Campaign</h3>
             {isSending ? (
               <div style={{ textAlign: 'center', padding: '20px 0' }}>
-                <p>Sending messages via Twilio Edge Server...</p>
+                <p>Sending messages via Supabase Edge Function → Twilio...</p>
                 <div style={{ background: 'var(--line)', height: '8px', borderRadius: '4px', overflow: 'hidden', marginTop: '12px' }}>
                   <div style={{ background: 'var(--brand)', height: '100%', width: `${sendingProgress}%`, transition: 'width 0.3s ease' }}></div>
                 </div>

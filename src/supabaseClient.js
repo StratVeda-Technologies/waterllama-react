@@ -332,6 +332,55 @@ export async function sendReminderViaEdge({ to, method, message }) {
 }
 
 /**
+ * Send bulk SMS via Supabase Edge Function → Twilio.
+ * Expects Edge Function "send-bulk-sms" with body: { recipients: string[], message: string, senderName?: string }
+ * Returns { ok: boolean, results?: Array<{ phone, success, sid?, error? }>, error?: string, notDeployed?: boolean }
+ */
+export async function sendBulkSmsViaEdge({ recipients, message, senderName }) {
+  if (!supabaseReady) {
+    console.log('[Local mode] Bulk SMS to', recipients.length, 'recipients')
+    return { ok: false, notDeployed: true, error: 'Supabase not configured' }
+  }
+
+  try {
+    const { data, error } = await supabase.functions.invoke('send-bulk-sms', {
+      body: { recipients, message, senderName },
+    })
+
+    if (error) {
+      const msg = error.message ?? ''
+      const isNotDeployed =
+        msg.includes('Failed to send a request') ||
+        msg.includes('Failed to fetch') ||
+        msg.includes('NetworkError') ||
+        msg.includes('404') ||
+        msg.includes('not found')
+
+      let detail = msg
+      try {
+        if (error.context && typeof error.context.json === 'function') {
+          const body = await error.context.json()
+          detail = body?.error ?? detail
+        }
+      } catch {
+        // ignore
+      }
+
+      return { ok: false, error: detail, notDeployed: isNotDeployed }
+    }
+
+    return data ?? { ok: false, error: 'Empty response from edge function' }
+  } catch (err) {
+    const msg = err?.message ?? 'Unexpected error'
+    const isNotDeployed =
+      msg.includes('Failed to send a request') ||
+      msg.includes('Failed to fetch') ||
+      msg.includes('NetworkError')
+    return { ok: false, error: msg, notDeployed: isNotDeployed }
+  }
+}
+
+/**
  * Checks whether all 4 required tables exist in the Supabase project.
  * Returns { ok: boolean, notConfigured?: boolean, tables: { name, exists, label }[] }
  */
