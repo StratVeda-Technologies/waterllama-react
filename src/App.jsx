@@ -10,7 +10,7 @@ import {
   supabase,
   supabaseReady,
   syncWaterEntriesToDB,
-} from './mysqlClient'
+} from './supabaseClient'
 import './App.css'
 import BulkSms from './BulkSms'
 

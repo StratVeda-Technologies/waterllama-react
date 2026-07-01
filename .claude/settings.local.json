@@ -14,7 +14,12 @@
       "Bash(rm -rf waterllama-react/.git)",
       "Bash(git branch *)",
       "Bash(ren dist\\\\sms-dashboard.html index.html)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(gh run *)",
+      "Bash(curl -s \"https://stratveda-technologies.github.io/waterllama-react/\")",
+      "Bash(gh api *)",
+      "Bash(gh workflow *)",
+      "Bash(curl -s \"https://stratveda-technologies.github.io/waterllama-react/assets/index-BCseFcjq.js\")"
     ]
   }
 }
