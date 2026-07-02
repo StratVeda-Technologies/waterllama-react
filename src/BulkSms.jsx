@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { sendBulkSmsViaEdge, dbReady } from './mysqlClient'
+import { sendBulkSmsViaEdge, isSupabaseConfigured } from './mysqlClient'
 import './BulkSms.css'
 
 const DEFAULT_CONTACTS = [
@@ -69,30 +69,16 @@ export default function BulkSms() {
   const [isSending, setIsSending] = useState(false)
   const [sendResult, setSendResult] = useState(null)
 
-  // Check backend availability on mount
+  // Check Supabase availability on mount
   useEffect(() => {
-    async function checkBackend() {
-      // In local mode, backend is not available
-      if (!dbReady) {
-        setBackendReady(false);
-        setBackendError('Running in local mode. Bulk SMS requires backend server (cd sms-backend && npm start).');
-      } else {
-        try {
-          const res = await fetch('/wl/check-tables', { method: 'GET' });
-          if (res.ok) {
-            setBackendReady(true);
-            setBackendError('');
-          } else {
-            setBackendReady(false);
-            setBackendError('MySQL backend not responding. Start the backend: cd sms-backend && npm start');
-          }
-        } catch (err) {
-          setBackendReady(false);
-          setBackendError('MySQL backend connection failed. Start the backend: cd sms-backend && npm start');
-        }
-      }
+    const supabaseReady = isSupabaseConfigured();
+    if (supabaseReady) {
+      setBackendReady(true);
+      setBackendError('');
+    } else {
+      setBackendReady(false);
+      setBackendError('Supabase not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to .env.local to enable Bulk SMS via Supabase Edge Functions.');
     }
-    checkBackend();
   }, []);
 
   // Save contacts to localStorage
@@ -285,11 +271,11 @@ export default function BulkSms() {
       <div className="sms-content">
         {!backendReady && (
           <div className="sms-warning-banner">
-            ⚠️ <b>Local Mode:</b> {backendError || 'Bulk SMS requires the backend server running.'}
+            ⚠️ <b>Supabase Not Configured:</b> {backendError || 'Bulk SMS requires Supabase Edge Functions.'}
             <br />
             <small>
-              This feature uses the MySQL backend (phpMyAdmin database) via local Express server on port 5000.
-              Start the backend: <code>cd sms-backend && npm start</code>
+              This feature uses Supabase Edge Functions for SMS via Twilio.
+              Add <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_ANON_KEY</code> to <code>.env.local</code>.
             </small>
           </div>
         )}

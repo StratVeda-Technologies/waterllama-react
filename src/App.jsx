@@ -7,6 +7,7 @@ import {
   saveRemoteProfile,
   sendReminderViaEdge,
   dbReady,
+  isSupabaseConfigured,
 } from './mysqlClient'
 import './App.css'
 import BulkSms from './BulkSms'
