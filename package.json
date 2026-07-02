@@ -7,9 +7,12 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "supabase:functions:deploy": "supabase functions deploy send-bulk-sms send-sms send-whatsapp log-reminder",
+    "supabase:secrets:set": "supabase secrets set TWILIO_ACCOUNT_SID TWILIO_AUTH_TOKEN TWILIO_PHONE_NUMBER TWILIO_MESSAGING_SERVICE_SID SUPABASE_SERVICE_ROLE_KEY"
   },
   "dependencies": {
+    "bootstrap": "^5.3.8",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
   },
