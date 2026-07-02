@@ -271,11 +271,11 @@ export default function BulkSms() {
       <div className="sms-content">
         {!backendReady && (
           <div className="sms-warning-banner">
-            ⚠️ <b>Supabase Not Configured:</b> {backendError || 'Bulk SMS requires Supabase Edge Functions.'}
+            ⚠️ <b>Bulk SMS requires Supabase Edge Functions + Twilio</b>
             <br />
             <small>
-              This feature uses Supabase Edge Functions for SMS via Twilio.
-              Add <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_ANON_KEY</code> to <code>.env.local</code>.
+              For now, use <b>WhatsApp</b> in Reminders tab — it works client-side via wa.me links (no backend needed).
+              To enable Bulk SMS: deploy Supabase Edge Functions with Twilio credentials.
             </small>
           </div>
         )}
@@ -283,7 +283,12 @@ export default function BulkSms() {
         {activeSubTab === 'compose' && (
           <div>
             <h2 className="sms-page-title">Compose Bulk Message</h2>
-            <p className="sms-page-subtitle">Send promotional or alert messages to multiple user contacts simultaneously.</p>
+            <p className="sms-page-subtitle">
+              {backendReady
+                ? 'Send SMS campaigns via Supabase Edge Functions → Twilio.'
+                : 'Configure Supabase + Twilio to enable bulk SMS. WhatsApp reminders work without backend.'
+              }
+            </p>
 
             <div className="sms-grid">
               <div>
@@ -299,7 +304,7 @@ export default function BulkSms() {
                   </div>
 
                   <div className="sms-form-group">
-                    <label>Sender Name / ID</label>
+                    <label>Sender Name (WhatsApp Business / SMS)</label>
                     <input
                       type="text"
                       className="sms-input"
@@ -344,24 +349,32 @@ export default function BulkSms() {
               </div>
 
               <div>
-                <h3 style={{ margin: '0 0 12px 0', fontSize: '1rem', fontWeight: 800 }}>Phone Preview</h3>
+                <h3 style={{ margin: '0 0 12px 0', fontSize: '1rem', fontWeight: 800 }}>Message Preview</h3>
                 <div className="sms-preview-phone">
                   <div className="sms-preview-header">
-                    💬 {senderName || 'Sender'}
+                    💬 {senderName || 'Aqualama'}
                   </div>
                   <div className="sms-preview-bubble">
-                    {message || 'Your SMS content preview will appear here.'}
+                    {message || 'Your message preview will appear here.'}
                   </div>
                 </div>
 
                 <div style={{ marginTop: '24px' }} className="sms-card">
-                  <h4 style={{ margin: '0 0 8px 0', fontSize: '0.9rem', fontWeight: 800 }}>Cost Summary</h4>
+                  <h4 style={{ margin: '0 0 8px 0', fontSize: '0.9rem', fontWeight: 800 }}>
+                    {backendReady ? 'SMS Cost Estimate' : 'WhatsApp: Free (via wa.me links)'}
+                  </h4>
                   <p style={{ margin: 0, fontSize: '0.85rem' }}>
                     Recipients: <b>{recipients.length}</b>
                     <br />
-                    SMS Parts: <b>{totalSms}</b>
-                    <br />
-                    Estimated Credits: <b>{recipients.length * totalSms}</b>
+                    {backendReady ? (
+                      <>
+                        SMS Parts: <b>{totalSms}</b>
+                        <br />
+                        Estimated Credits: <b>{recipients.length * totalSms}</b>
+                      </>
+                    ) : (
+                      'WhatsApp messages are free — opens individual chats via wa.me'
+                    )}
                   </p>
                 </div>
               </div>

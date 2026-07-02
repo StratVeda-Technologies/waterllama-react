@@ -356,34 +356,27 @@ function App() {
     setAutoSendStatus('sending')
     setAutoSendError('')
 
-    if (notificationMethod === 'WhatsApp') {
-      // ── WhatsApp: open wa.me link with message pre-filled (no Twilio needed) ──
-      try {
-        const rawPhone = cleanPhone.replace(/^\+/, '')
-        const encodedMsg = encodeURIComponent(reminderMessage)
-        const deeplink = `https://wa.me/${rawPhone}?text=${encodedMsg}`
-        window.open(deeplink, '_blank', 'noopener,noreferrer')
+    // ── WhatsApp: open wa.me link with message pre-filled (no backend needed) ──
+    try {
+      const rawPhone = cleanPhone.replace(/^\+/, '')
+      const encodedMsg = encodeURIComponent(reminderMessage)
+      const deeplink = `https://wa.me/${rawPhone}?text=${encodedMsg}`
+      window.open(deeplink, '_blank', 'noopener,noreferrer')
 
-        const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        setLastReminder(now)
-        setLastAutoSent(new Date().toISOString())
-        setAutoSendStatus('sent')
-        setTimeout(() => setAutoSendStatus('idle'), 4000)
+      const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      setLastReminder(now)
+      setLastAutoSent(new Date().toISOString())
+      setAutoSendStatus('sent')
+      setTimeout(() => setAutoSendStatus('idle'), 4000)
 
-        if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-          new Notification('Aqualama — WhatsApp reminder', {
-            body: `WhatsApp opened with reminder for ${cleanPhone}`,
-          })
-        }
-      } catch (err) {
-        console.error('sendReminder WhatsApp error:', err)
-        setAutoSendError(err.message ?? 'Could not open WhatsApp')
-        setAutoSendStatus('error')
-        setTimeout(() => setAutoSendStatus('idle'), 6000)
+      if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+        new Notification('Aqualama — WhatsApp reminder', {
+          body: `WhatsApp opened with reminder for ${cleanPhone}`,
+        })
       }
-    } else {
-      // ── SMS: requires backend server (not available in local mode) ──
-      setAutoSendError('SMS requires backend server. Use WhatsApp or run: cd sms-backend && npm start')
+    } catch (err) {
+      console.error('sendReminder WhatsApp error:', err)
+      setAutoSendError(err.message ?? 'Could not open WhatsApp')
       setAutoSendStatus('error')
       setTimeout(() => setAutoSendStatus('idle'), 6000)
     }
@@ -769,7 +762,7 @@ function App() {
               <p>Reminders fire automatically via {notificationMethod}. Enable them, add your number, and the app handles the rest.</p>
 
               <div className="method-toggle">
-                {['WhatsApp', 'SMS'].map((method) => (
+                {['WhatsApp'].map((method) => (
                   <button
                     className={notificationMethod === method ? 'active' : ''}
                     key={method}
@@ -779,6 +772,9 @@ function App() {
                     {method}
                   </button>
                 ))}
+                <span className="method-note" title="WhatsApp works without backend — opens wa.me link">
+                  💡 WhatsApp only (no backend needed)
+                </span>
               </div>
 
               <div className="section-heading">
@@ -855,7 +851,7 @@ function App() {
                   disabled={autoSendStatus === 'sending' || !cleanPhone}
                   onClick={() => sendReminder()}
                 >
-                  {autoSendStatus === 'sending' ? 'Sending…' : `Send ${notificationMethod} now`}
+                  {autoSendStatus === 'sending' ? 'Opening…' : 'Send WhatsApp now'}
                 </button>
                 <button
                   className="secondary-action"
@@ -881,7 +877,7 @@ function App() {
                   <li>Premium status</li>
                 </ul>
                 <p style={{ margin: '12px 0 0 0', fontSize: '0.85rem', color: 'var(--muted)' }}>
-                  For SMS reminders & Bulk SMS: run the local backend server (<code>cd sms-backend && npm start</code>)
+                  WhatsApp reminders work via wa.me links (no backend needed). For Bulk SMS: configure Supabase Edge Functions.
                 </p>
               </div>
             </section>
