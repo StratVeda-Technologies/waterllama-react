@@ -158,7 +158,7 @@ export default function BulkSms() {
   // Get active recipients
   const recipients = contacts.filter(c => c.selected).map(c => c.phone)
 
-  // Send campaign handler - uses Supabase Edge Functions
+  // Send campaign handler - WhatsApp via wa.me (client-side), SMS via Supabase Edge Functions
   const handleSendCampaign = async () => {
     if (recipients.length === 0) {
       alert('Please select at least one recipient.')
@@ -169,7 +169,8 @@ export default function BulkSms() {
       return
     }
 
-    if (!backendReady) {
+    // For SMS, check backend readiness
+    if (messageType === 'sms' && !backendReady) {
       alert('Supabase not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to .env.local and deploy Edge Functions.')
       return
     }
@@ -227,7 +228,7 @@ export default function BulkSms() {
         delivered,
         failed,
         date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-        provider: messageType === 'whatsapp' ? 'CallMeBot (WhatsApp)' : 'Twilio (SMS)',
+        provider: messageType === 'whatsapp' ? 'wa.me (WhatsApp)' : 'Twilio (SMS)',
         timestamp: new Date().toISOString(),
       }
       setHistory(prev => [newHistoryEntry, ...prev].slice(0, 100))
@@ -274,12 +275,12 @@ export default function BulkSms() {
       </div>
 
       <div className="sms-content">
-        {!backendReady && (
+        {messageType === 'sms' && !backendReady && (
           <div className="sms-warning-banner">
             ⚠️ <b>Bulk SMS requires Supabase Edge Functions + Twilio</b>
             <br />
             <small>
-              For now, use <b>WhatsApp</b> in Reminders tab — it works client-side via wa.me links (no backend needed).
+              For now, use <b>WhatsApp</b> — it works client-side via wa.me links (no backend needed).
               To enable Bulk SMS: deploy Supabase Edge Functions with Twilio credentials.
             </small>
           </div>
@@ -289,9 +290,11 @@ export default function BulkSms() {
           <div>
             <h2 className="sms-page-title">Compose Bulk Message</h2>
             <p className="sms-page-subtitle">
-              {backendReady
-                ? 'Send SMS campaigns via Supabase Edge Functions → Twilio.'
-                : 'Configure Supabase + Twilio to enable bulk SMS. WhatsApp reminders work without backend.'
+              {messageType === 'whatsapp'
+                ? 'WhatsApp via wa.me links — free, no backend needed.'
+                : backendReady
+                  ? 'Send SMS campaigns via Supabase Edge Functions → Twilio.'
+                  : 'Configure Supabase + Twilio to enable bulk SMS.'
               }
             </p>
 
@@ -372,7 +375,7 @@ export default function BulkSms() {
                   <button
                     className="sms-btn sms-btn-primary"
                     onClick={handleSendCampaign}
-                    disabled={!backendReady || isSending}
+                    disabled={(messageType === 'sms' && !backendReady) || isSending}
                   >
                     {isSending ? '📤 Sending...' : `📤 Send Campaign to ${recipients.length} Users`}
                   </button>
