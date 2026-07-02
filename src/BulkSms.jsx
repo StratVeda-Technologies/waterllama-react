@@ -217,6 +217,7 @@ export default function BulkSms() {
         delivered,
         failed,
         results: result.results ?? [],
+        waLinks: messageType === 'whatsapp' ? result.waLinks : undefined,
       })
 
       // Save to history
@@ -596,7 +597,9 @@ export default function BulkSms() {
             <h3 className="sms-modal-title">Sending Bulk Campaign</h3>
             {isSending ? (
               <div style={{ textAlign: 'center', padding: '20px 0' }}>
-                <p>Sending messages via MySQL backend → Twilio...</p>
+                <p>{messageType === 'whatsapp'
+                  ? 'Opening WhatsApp chats via wa.me links...'
+                  : 'Sending messages via Supabase Edge Functions → Twilio...'}</p>
                 <div style={{ background: 'var(--line)', height: '8px', borderRadius: '4px', overflow: 'hidden', marginTop: '12px' }}>
                   <div style={{ background: 'var(--brand)', height: '100%', width: `${sendingProgress}%`, transition: 'width 0.3s ease' }}></div>
                 </div>
@@ -619,6 +622,29 @@ export default function BulkSms() {
                       <br />
                       Failed: <b>{sendResult?.failed}</b>
                     </p>
+                    {messageType === 'whatsapp' && sendResult?.waLinks && sendResult.waLinks.length > 0 && (
+                      <div style={{ marginTop: '16px', padding: '12px', background: 'var(--soft)', borderRadius: '8px', border: '1px solid var(--line)' }}>
+                        <p style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '8px' }}>
+                          📱 WhatsApp chats opened via wa.me links
+                        </p>
+                        <p style={{ fontSize: '0.75rem', color: 'var(--muted)', marginBottom: '8px' }}>
+                          If popups were blocked, click links below to open manually:
+                        </p>
+                        <div style={{ maxHeight: '150px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          {sendResult.waLinks.slice(0, 10).map((link, i) => (
+                            <a key={i} href={link} target="_blank" rel="noopener noreferrer"
+                               style={{ fontSize: '0.75rem', color: 'var(--brand)', textDecoration: 'underline', cursor: 'pointer' }}>
+                              📱 Contact {i + 1} (wa.me)
+                            </a>
+                          ))}
+                          {sendResult.waLinks.length > 10 && (
+                            <span style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>
+                              + {sendResult.waLinks.length - 10} more contacts...
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
                 <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end' }}>

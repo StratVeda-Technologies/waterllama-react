@@ -286,30 +286,38 @@ export async function sendBulkSmsViaEdge({ recipients, message, senderName }) {
 /**
  * Send bulk WhatsApp via wa.me links (client-side, free, no backend needed)
  * Opens individual WhatsApp chats with pre-filled messages
+ * Returns wa.me links for manual opening if popups blocked
  */
 export async function sendBulkWhatsAppViaEdge({ recipients, message, senderName }) {
   // This works entirely client-side via wa.me links - no backend required
-  // Returns simulated results for UI consistency
+  // Returns simulated results for UI consistency + links for manual access
 
-  const results = recipients.map((phone, index) => {
+  const waLinks = recipients.map((phone, index) => {
     // Normalize phone: remove + and non-digits
     const cleanPhone = phone.replace(/[^\d]/g, '');
     const encodedMsg = encodeURIComponent(message);
     const waLink = `https://wa.me/${cleanPhone}?text=${encodedMsg}`;
-
-    // Open in new tab (with small delay to avoid popup blockers)
-    setTimeout(() => {
-      window.open(waLink, '_blank', 'noopener,noreferrer');
-    }, index * 100);
-
-    return {
-      phone,
-      success: true,
-      sid: `wa.me_${Date.now()}_${index}`,
-      provider: 'wa.me (client-side)',
-      simulated: true,
-    };
+    return { phone, waLink, index };
   });
 
-  return { ok: true, results };
+  // Open all links simultaneously (modern browsers allow multiple tabs from user action)
+  waLinks.forEach(({ waLink }) => {
+    window.open(waLink, '_blank', 'noopener,noreferrer');
+  });
+
+  // Also store links globally for manual access if popups blocked
+  if (typeof window !== 'undefined') {
+    window.__waMeLinks = waLinks.map(l => l.waLink);
+    window.__waMeContacts = waLinks.map(l => l.phone);
+  }
+
+  const results = waLinks.map(({ phone, index }) => ({
+    phone,
+    success: true,
+    sid: `wa.me_${Date.now()}_${index}`,
+    provider: 'wa.me (client-side)',
+    simulated: true,
+  }));
+
+  return { ok: true, results, waLinks: waLinks.map(l => l.waLink) };
 }
