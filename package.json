@@ -7,11 +7,9 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "oxlint",
-    "preview": "vite preview",
-    "db:push": "supabase db push"
+    "preview": "vite preview"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.108.2",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
   },

@@ -1,5 +1,13 @@
 [
   {
+    "id": 31,
+    "message": "Stay strong {name}! You are close to hitting your daily water target today. Keep tracking!",
+    "sent": 1,
+    "delivered": 1,
+    "failed": 0,
+    "timestamp": "2026-07-01T17:06:23.265Z"
+  },
+  {
     "id": 27,
     "message": "Hi User, time to drink water. You have completed 31% of your 2.5 L hydration goal today.",
     "sent": 1,

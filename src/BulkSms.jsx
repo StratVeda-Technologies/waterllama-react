@@ -69,30 +69,31 @@ export default function BulkSms() {
   const [isSending, setIsSending] = useState(false)
   const [sendResult, setSendResult] = useState(null)
 
-  // Check MySQL backend on mount
+  // Check backend availability on mount
   useEffect(() => {
     async function checkBackend() {
-      try {
-        // Test if the MySQL backend is running
-        const res = await fetch('http://localhost:5000/wl/load-profile', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId: null }),
-        })
-        if (res.ok) {
-          setBackendReady(true)
-          setBackendError('')
-        } else {
-          setBackendReady(false)
-          setBackendError('MySQL backend not responding. Start the backend server (cd sms-backend && npm start).')
+      // In local mode, backend is not available
+      if (!dbReady) {
+        setBackendReady(false);
+        setBackendError('Running in local mode. Bulk SMS requires backend server (cd sms-backend && npm start).');
+      } else {
+        try {
+          const res = await fetch('/wl/check-tables', { method: 'GET' });
+          if (res.ok) {
+            setBackendReady(true);
+            setBackendError('');
+          } else {
+            setBackendReady(false);
+            setBackendError('MySQL backend not responding. Start the backend: cd sms-backend && npm start');
+          }
+        } catch (err) {
+          setBackendReady(false);
+          setBackendError('MySQL backend connection failed. Start the backend: cd sms-backend && npm start');
         }
-      } catch (err) {
-        setBackendReady(false)
-        setBackendError('MySQL backend not running. Start the backend server (cd sms-backend && npm start).')
       }
     }
-    checkBackend()
-  }, [])
+    checkBackend();
+  }, []);
 
   // Save contacts to localStorage
   useEffect(() => {
@@ -182,7 +183,7 @@ export default function BulkSms() {
     }
 
     if (!backendReady) {
-      alert('MySQL backend not running. Please start the backend server (cd sms-backend && npm start).')
+      alert('Backend server not running. Please start the backend server (cd sms-backend && npm start) to send SMS.')
       return
     }
 
@@ -284,7 +285,7 @@ export default function BulkSms() {
       <div className="sms-content">
         {!backendReady && (
           <div className="sms-warning-banner">
-            ⚠️ <b>API Notice:</b> {backendError || 'MySQL backend not configured. Bulk SMS requires the backend server running.'}
+            ⚠️ <b>Local Mode:</b> {backendError || 'Bulk SMS requires the backend server running.'}
             <br />
             <small>
               This feature uses the MySQL backend (phpMyAdmin database) via local Express server on port 5000.

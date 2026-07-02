@@ -32,7 +32,9 @@
       "Bash(npm --version)",
       "Bash(mysql *)",
       "PowerShell(& \"C:\\\\Program Files\\\\MySQL\\\\MySQL Server 8.0\\\\bin\\\\mysql.exe\" -u root -p\"\" -e \"SHOW DATABASES;\")",
-      "Bash(curl *)"
+      "Bash(curl *)",
+      "Bash(rm -rf ~/.npm/_cache)",
+      "Bash(rm -rf /tmp/*)"
     ]
   }
 }

@@ -1,14 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   addRemoteWaterEntry,
-  checkDatabaseTables,
   deleteRemoteWaterEntries,
   loadRemoteState,
   logRemoteReminder,
   saveRemoteProfile,
   sendReminderViaEdge,
   dbReady,
-  syncWaterEntriesToDB,
 } from './mysqlClient'
 import './App.css'
 import BulkSms from './BulkSms'
@@ -149,19 +147,12 @@ function App() {
   const [browserPermission, setBrowserPermission] = useState(getNotificationPermission())
   const [userId, setUserId] = useState(stored?.userId ?? '')
   const [remoteLoaded, setRemoteLoaded] = useState(false)
-  const [syncStatus, setSyncStatus] = useState(
-    dbReady ? 'Connecting to database...' : 'Local mode',
-  )
+  const [syncStatus, setSyncStatus] = useState('Local mode (localStorage)')
   // Auto-reminder state
   const [autoSendStatus, setAutoSendStatus] = useState('idle') // idle | sending | sent | error
   const [autoSendError, setAutoSendError] = useState('')
   const [lastAutoSent, setLastAutoSent] = useState(stored?.lastAutoSent ?? null) // ISO string
   const [nextReminderIn, setNextReminderIn] = useState(null) // seconds until next fire
-  // DB setup panel state
-  const [dbStatus, setDbStatus] = useState(null)   // null | { ok, tables, notConfigured }
-  const [dbChecking, setDbChecking] = useState(false)
-  const [syncPending, setSyncPending] = useState(false)
-  const [syncResult, setSyncResult] = useState(null) // null | { synced, skipped, failed, errors }
 
   // Refs for auto-reminder engine (prevent stale closure + duplicate sends)
   const isSendingRef = useRef(false)   // guard: only one send at a time
@@ -239,11 +230,6 @@ function App() {
     let cancelled = false
 
     async function loadDatabase() {
-      if (!dbReady) {
-        setRemoteLoaded(true)
-        return
-      }
-
       try {
         const remote = await loadRemoteState()
         if (cancelled || !remote) return
@@ -260,9 +246,9 @@ function App() {
         setIsPremium(remote.isPremium)
         setPremiumPlan(remote.premiumPlan || 'Free')
         setPremiumExpiry(remote.premiumExpiry || null)
-        setSyncStatus('Database connected')
+        setSyncStatus('Loaded from localStorage')
       } catch (error) {
-        setSyncStatus(`Database error: ${error.message}`)
+        setSyncStatus(`Error: ${error.message}`)
       } finally {
         if (!cancelled) setRemoteLoaded(true)
       }
@@ -279,13 +265,13 @@ function App() {
   // Premium status is synced via regular profile save/load operations.
 
   useEffect(() => {
-    if (!dbReady || !remoteLoaded || !userId) {
+    if (!remoteLoaded || !userId) {
       return
     }
 
     const handle = window.setTimeout(async () => {
       try {
-        setSyncStatus('Saving to database...')
+        setSyncStatus('Saving to localStorage...')
         await saveRemoteProfile({
           userId,
           userName,
@@ -299,9 +285,9 @@ function App() {
           premiumPlan,
           premiumExpiry,
         })
-        setSyncStatus('Database synced')
+        setSyncStatus('Saved to localStorage')
       } catch (error) {
-        setSyncStatus(`Database error: ${error.message}`)
+        setSyncStatus(`Error: ${error.message}`)
       }
     }, 700)
 
@@ -327,7 +313,7 @@ function App() {
     const entry = { id: Date.now(), amount: Number(size), time, type: drinkType, date: todayKey }
     setLogs((current) => [entry, ...current])
 
-    if (!dbReady || !userId) {
+    if (!userId) {
       return
     }
 
@@ -343,24 +329,24 @@ function App() {
           current.map((item) => (item.id === entry.id ? remoteEntry : item)),
         )
       }
-      setSyncStatus('Database synced')
+      setSyncStatus('Saved to localStorage')
     } catch (error) {
-      setSyncStatus(`Database error: ${error.message}`)
+      setSyncStatus(`Error: ${error.message}`)
     }
   }
 
   async function resetDay() {
     setLogs([])
-    if (!dbReady || !userId) {
+    if (!userId) {
       return
     }
 
     try {
       setSyncStatus('Deleting entries...')
       await deleteRemoteWaterEntries(userId)
-      setSyncStatus('Database synced')
+      setSyncStatus('Deleted from localStorage')
     } catch (error) {
-      setSyncStatus(`Database error: ${error.message}`)
+      setSyncStatus(`Error: ${error.message}`)
     }
   }
 
@@ -395,54 +381,10 @@ function App() {
         setTimeout(() => setAutoSendStatus('idle'), 6000)
       }
     } else {
-      // ── SMS: send automatically via Twilio backend ──
-      try {
-        const result = await sendReminderViaEdge({
-          to: cleanPhone,
-          method: 'SMS',
-          message: reminderMessage,
-          userId,
-        })
-
-        if (result.ok) {
-          await logRemoteReminder({
-            userId,
-            method: 'SMS',
-            phone: cleanPhone,
-            message: reminderMessage,
-            status: 'sent',
-            providerSid: result.sid,
-          })
-          const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          setLastReminder(now)
-          setLastAutoSent(new Date().toISOString())
-          setAutoSendStatus('sent')
-          setTimeout(() => setAutoSendStatus('idle'), 4000)
-
-          if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-            new Notification('Aqualama — SMS sent ✓', {
-              body: `SMS reminder delivered to ${cleanPhone} via Twilio`,
-            })
-          }
-        } else {
-          await logRemoteReminder({
-            userId,
-            method: 'SMS',
-            phone: cleanPhone,
-            message: reminderMessage,
-            status: 'failed',
-            errorMessage: result.error,
-          })
-          setAutoSendError(result.error ?? 'Twilio SMS error')
-          setAutoSendStatus('error')
-          setTimeout(() => setAutoSendStatus('idle'), 6000)
-        }
-      } catch (err) {
-        console.error('sendReminder SMS error:', err)
-        setAutoSendError(err.message ?? 'SMS send failed')
-        setAutoSendStatus('error')
-        setTimeout(() => setAutoSendStatus('idle'), 6000)
-      }
+      // ── SMS: requires backend server (not available in local mode) ──
+      setAutoSendError('SMS requires backend server. Use WhatsApp or run: cd sms-backend && npm start')
+      setAutoSendStatus('error')
+      setTimeout(() => setAutoSendStatus('idle'), 6000)
     }
   }
 
@@ -925,106 +867,22 @@ function App() {
             </section>
 
             <section className="backend-panel">
-              <p className="eyebrow">MySQL (phpMyAdmin) backend</p>
-              <h2>Database setup</h2>
-
-              {/* ── Live table status ── */}
-              <div className="db-table-list">
-                {dbStatus && dbStatus.tables.length > 0
-                  ? dbStatus.tables.map((t) => (
-                      <div key={t.name} className={`db-table-row ${t.exists ? 'db-row--ok' : 'db-row--missing'}`}>
-                        <span className="db-row-dot">{t.exists ? '✓' : '✗'}</span>
-                        <strong>{t.label}</strong>
-                        <small>{t.exists ? 'Ready' : 'Not found'}</small>
-                      </div>
-                    ))
-                  : ['Users', 'Water Entries', 'Goals', 'Subscriptions'].map((name) => (
-                      <div key={name} className="db-table-row db-row--idle">
-                        <span className="db-row-dot">·</span>
-                        <strong>{name}</strong>
-                        <small>Not checked</small>
-                      </div>
-                    ))}
+              <p className="eyebrow">Local mode (localStorage)</p>
+              <h2>Running in local mode</h2>
+              <p>All data is stored in your browser's localStorage. No database server required.</p>
+              <p>Works offline and on any device - just open the app!</p>
+              <div style={{ marginTop: '16px', padding: '16px', background: 'var(--soft)', borderRadius: '12px', border: '1px solid var(--line)' }}>
+                <strong>✅ Data persists locally</strong>
+                <ul style={{ margin: '8px 0 0 0', paddingLeft: '20px', fontSize: '0.9rem' }}>
+                  <li>Water intake logs</li>
+                  <li>User profile & settings</li>
+                  <li>Reminders & preferences</li>
+                  <li>Premium status</li>
+                </ul>
+                <p style={{ margin: '12px 0 0 0', fontSize: '0.85rem', color: 'var(--muted)' }}>
+                  For SMS reminders & Bulk SMS: run the local backend server (<code>cd sms-backend && npm start</code>)
+                </p>
               </div>
-
-              {/* ── Status message ── */}
-              {dbStatus?.ok === true && (
-                <p className="db-msg db-msg--ok">✓ All tables found — database is ready!</p>
-              )}
-              {dbStatus?.ok === false && (
-                <p className="db-msg db-msg--error">✗ Some tables missing. Run the SQL below in your phpMyAdmin SQL editor.</p>
-              )}
-
-              {/* ── Action buttons ── */}
-              <div className="db-actions">
-                <button
-                  id="btn-check-db"
-                  className="primary-action"
-                  type="button"
-                  disabled={dbChecking}
-                  onClick={async () => {
-                    setDbChecking(true)
-                    const result = await checkDatabaseTables()
-                    setDbStatus(result)
-                    setDbChecking(false)
-                  }}
-                >
-                  {dbChecking
-                    ? '⏳ Checking…'
-                    : dbStatus
-                    ? '↺ Re-check tables'
-                    : '🔍 Check database tables'}
-                </button>
-
-                <button
-                  id="btn-sync-water"
-                  className="primary-action"
-                  type="button"
-                  disabled={syncPending || !dbReady || !userId}
-                  style={{ background: 'var(--brand)' }}
-                  onClick={async () => {
-                    setSyncPending(true)
-                    setSyncResult(null)
-
-                    // Step 1: push all local-only entries to phpMyAdmin
-                    const result = await syncWaterEntriesToDB({ userId, logs, drinkFactors })
-                    setSyncResult(result)
-
-                    // Step 2: if any entries were synced, reload logs from DB
-                    // so local state gets the proper UUID ids (prevents duplicate syncs)
-                    if (result.synced > 0) {
-                      try {
-                        setSyncStatus('Refreshing from database…')
-                        const remote = await loadRemoteState()
-                        if (remote && remote.logs.length > 0) {
-                          setLogs(remote.logs)
-                          setSyncStatus('Database synced ✓')
-                        }
-                      } catch {
-                        setSyncStatus('Sync done (refresh failed)')
-                      }
-                    }
-
-                    setSyncPending(false)
-                  }}
-                >
-                  {syncPending ? '⏳ Syncing…' : '💧 Sync Water Data → DB'}
-                </button>
-              </div>
-
-              {/* ── Sync result ── */}
-              {syncResult && (
-                <div className={`db-msg ${syncResult.failed > 0 ? 'db-msg--error' : 'db-msg--ok'}`}>
-                  {syncResult.synced > 0 && <span>✓ {syncResult.synced} entr{syncResult.synced === 1 ? 'y' : 'ies'} synced to phpMyAdmin. </span>}
-                  {syncResult.skipped > 0 && <span>· {syncResult.skipped} already in DB. </span>}
-                  {syncResult.failed > 0 && <span>✗ {syncResult.failed} failed. {syncResult.errors[0]}</span>}
-                  {syncResult.synced === 0 && syncResult.failed === 0 && <span>All entries are already synced ✓</span>}
-                </div>
-              )}
-
-              <p className="backend-note">
-                Paste your migration SQL in the editor, click Run — then hit Check database tables above to confirm.
-              </p>
             </section>
           </div>
         )}
