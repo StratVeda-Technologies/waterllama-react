@@ -37,7 +37,10 @@
       "Bash(rm -rf /tmp/*)",
       "Read(//tmp/**)",
       "Read(//tmp/artifact/**)",
-      "Bash(tar -xf /tmp/artifact/artifact.tar -C /tmp/artifact)"
+      "Bash(tar -xf /tmp/artifact/artifact.tar -C /tmp/artifact)",
+      "Bash(supabase *)",
+      "Bash(npx supabase *)",
+      "Bash(git pull *)"
     ]
   }
 }
