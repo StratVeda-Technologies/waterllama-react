@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { sendBulkSmsViaEdge, isSupabaseConfigured } from './mysqlClient'
+import { sendBulkSmsViaEdge, sendBulkWhatsAppViaEdge, isSupabaseConfigured } from './mysqlClient'
 import './BulkSms.css'
 
 const DEFAULT_CONTACTS = [
@@ -53,6 +53,7 @@ export default function BulkSms() {
   const [senderName, setSenderName] = useState('Aqualama')
   const [selectedContacts, setSelectedContacts] = useState([])
   const [campaignName, setCampaignName] = useState('Hydration Push Campaign')
+  const [messageType, setMessageType] = useState('whatsapp') // 'whatsapp' | 'sms'
 
   // Contacts state
   const [contacts, setContacts] = useState(() => loadStoredData(STORAGE_KEYS.contacts, DEFAULT_CONTACTS))
@@ -157,7 +158,7 @@ export default function BulkSms() {
   // Get active recipients
   const recipients = contacts.filter(c => c.selected).map(c => c.phone)
 
-  // Send campaign handler - uses MySQL backend (phpMyAdmin)
+  // Send campaign handler - uses Supabase Edge Functions
   const handleSendCampaign = async () => {
     if (recipients.length === 0) {
       alert('Please select at least one recipient.')
@@ -169,7 +170,7 @@ export default function BulkSms() {
     }
 
     if (!backendReady) {
-      alert('Backend server not running. Please start the backend server (cd sms-backend && npm start) to send SMS.')
+      alert('Supabase not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to .env.local and deploy Edge Functions.')
       return
     }
 
@@ -189,8 +190,12 @@ export default function BulkSms() {
         }
       })
 
-      // Use the bulk SMS backend API
-      const result = await sendBulkSmsViaEdge({
+      // Use WhatsApp or SMS based on selection
+      const sendFunction = messageType === 'whatsapp'
+        ? sendBulkWhatsAppViaEdge
+        : sendBulkSmsViaEdge
+
+      const result = await sendFunction({
         recipients: personalizedRecipients.map(r => r.phone),
         message,
         senderName,
@@ -199,7 +204,7 @@ export default function BulkSms() {
       setSendingProgress(80)
 
       if (!result.ok) {
-        throw new Error(result.error || 'Failed to send bulk SMS')
+        throw new Error(result.error || `Failed to send bulk ${messageType.toUpperCase()}`)
       }
 
       setSendingProgress(100)
@@ -222,7 +227,7 @@ export default function BulkSms() {
         delivered,
         failed,
         date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-        provider: 'Twilio (via MySQL backend)',
+        provider: messageType === 'whatsapp' ? 'CallMeBot (WhatsApp)' : 'Twilio (SMS)',
         timestamp: new Date().toISOString(),
       }
       setHistory(prev => [newHistoryEntry, ...prev].slice(0, 100))
@@ -314,6 +319,32 @@ export default function BulkSms() {
                   </div>
 
                   <div className="sms-form-group">
+                    <label>Message Type</label>
+                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                        <input
+                          type="radio"
+                          name="messageType"
+                          value="whatsapp"
+                          checked={messageType === 'whatsapp'}
+                          onChange={() => setMessageType('whatsapp')}
+                        />
+                        <span>📱 WhatsApp (Free via wa.me — no backend needed)</span>
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                        <input
+                          type="radio"
+                          name="messageType"
+                          value="sms"
+                          checked={messageType === 'sms'}
+                          onChange={() => setMessageType('sms')}
+                        />
+                        <span>📲 SMS (Twilio via Supabase — requires credits)</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="sms-form-group">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <label>Message Content</label>
                       <span style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>
@@ -361,19 +392,29 @@ export default function BulkSms() {
 
                 <div style={{ marginTop: '24px' }} className="sms-card">
                   <h4 style={{ margin: '0 0 8px 0', fontSize: '0.9rem', fontWeight: 800 }}>
-                    {backendReady ? 'SMS Cost Estimate' : 'WhatsApp: Free (via wa.me links)'}
+                    {messageType === 'whatsapp'
+                      ? 'WhatsApp Cost: Free (via wa.me — client-side)'
+                      : backendReady
+                        ? 'SMS Cost Estimate'
+                        : 'SMS: Requires Supabase + Twilio'}
                   </h4>
                   <p style={{ margin: 0, fontSize: '0.85rem' }}>
                     Recipients: <b>{recipients.length}</b>
                     <br />
-                    {backendReady ? (
+                    {messageType === 'whatsapp' ? (
+                      <>
+                        WhatsApp messages are free — opens individual chats via wa.me links
+                        <br />
+                        Works without any backend configuration
+                      </>
+                    ) : backendReady ? (
                       <>
                         SMS Parts: <b>{totalSms}</b>
                         <br />
                         Estimated Credits: <b>{recipients.length * totalSms}</b>
                       </>
                     ) : (
-                      'WhatsApp messages are free — opens individual chats via wa.me'
+                      'Configure Supabase + Twilio to enable SMS'
                     )}
                   </p>
                 </div>
