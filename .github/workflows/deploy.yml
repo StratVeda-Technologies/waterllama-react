@@ -74,4 +74,4 @@ jobs:
           supabase secrets set TWILIO_AUTH_TOKEN=${{ secrets.TWILIO_AUTH_TOKEN }} --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} --token ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           supabase secrets set TWILIO_PHONE_NUMBER=${{ secrets.TWILIO_PHONE_NUMBER }} --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} --token ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           supabase secrets set TWILIO_MESSAGING_SERVICE_SID=${{ secrets.TWILIO_MESSAGING_SERVICE_SID }} --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} --token ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          supabase secrets set SUPABASE_SERVICE_ROLE_ROLE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }} --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} --token ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          supabase secrets set SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }} --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} --token ${{ secrets.SUPABASE_ACCESS_TOKEN }}
