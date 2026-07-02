@@ -51,6 +51,8 @@ jobs:
   # Deploy Supabase Edge Functions (requires Supabase CLI and secrets)
   deploy-edge-functions:
     runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -58,20 +60,18 @@ jobs:
         uses: supabase/setup-cli@v1
         with:
           version: latest
-      - name: Login to Supabase
-        run: supabase login --token ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       - name: Link Supabase project
-        run: supabase link --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} --token ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: supabase link --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
       - name: Deploy Edge Functions
         run: |
-          supabase functions deploy send-bulk-sms --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} --token ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          supabase functions deploy send-sms --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} --token ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          supabase functions deploy send-whatsapp --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} --token ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          supabase functions deploy log-reminder --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} --token ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          supabase functions deploy send-bulk-sms --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+          supabase functions deploy send-sms --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+          supabase functions deploy send-whatsapp --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+          supabase functions deploy log-reminder --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
       - name: Set Edge Function Secrets
         run: |
-          supabase secrets set TWILIO_ACCOUNT_SID=${{ secrets.TWILIO_ACCOUNT_SID }} --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} --token ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          supabase secrets set TWILIO_AUTH_TOKEN=${{ secrets.TWILIO_AUTH_TOKEN }} --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} --token ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          supabase secrets set TWILIO_PHONE_NUMBER=${{ secrets.TWILIO_PHONE_NUMBER }} --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} --token ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          supabase secrets set TWILIO_MESSAGING_SERVICE_SID=${{ secrets.TWILIO_MESSAGING_SERVICE_SID }} --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} --token ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          supabase secrets set SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }} --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} --token ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          supabase secrets set TWILIO_ACCOUNT_SID=${{ secrets.TWILIO_ACCOUNT_SID }} --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+          supabase secrets set TWILIO_AUTH_TOKEN=${{ secrets.TWILIO_AUTH_TOKEN }} --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+          supabase secrets set TWILIO_PHONE_NUMBER=${{ secrets.TWILIO_PHONE_NUMBER }} --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+          supabase secrets set TWILIO_MESSAGING_SERVICE_SID=${{ secrets.TWILIO_MESSAGING_SERVICE_SID }} --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+          supabase secrets set SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }} --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
