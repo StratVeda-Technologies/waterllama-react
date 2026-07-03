@@ -76,4 +76,4 @@ jobs:
           if [ -n "${{ secrets.TWILIO_MESSAGING_SERVICE_SID }}" ]; then
             supabase secrets set TWILIO_MESSAGING_SERVICE_SID="${{ secrets.TWILIO_MESSAGING_SERVICE_SID }}" --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
           fi
-          supabase secrets set SUPABASE_SERVICE_ROLE_KEY="${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+          supabase secrets set SERVICE_ROLE_KEY="${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
