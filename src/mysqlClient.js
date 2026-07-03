@@ -251,21 +251,26 @@ export async function sendReminderViaEdge({ to, method, message, userId }) {
     }
 
     // SMS: Try Supabase Edge Function first
+    let supabaseError = null;
     if (isSupabaseConfigured()) {
       try {
         const result = await callSupabaseFunction('send-reminder', { to: normalizedTo, message, method: 'SMS', userId });
         if (result.ok) return result;
-        console.warn('Supabase SMS reminder failed, trying local backend fallback:', result.error);
+        supabaseError = result.error;
+        console.warn('Supabase SMS reminder failed:', result.error);
       } catch (err) {
-        console.warn('Supabase SMS reminder failed, trying local backend fallback:', err.message);
+        supabaseError = err.message;
+        console.warn('Supabase SMS reminder failed:', err.message);
       }
+    } else {
+      supabaseError = 'Supabase configuration is missing. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY/VITE_SUPABASE_PUBLISHABLE_KEY in your GitHub Repository secrets.';
     }
 
     // Local Node.js server fallback (port 5000) — only works when running locally
     const isDeployed = typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
     if (isDeployed) {
-      // On deployed/GitHub Pages — no local server available
-      throw new Error('SMS failed: Supabase Edge Function returned an error. Please check Supabase Edge Function logs or verify your Twilio credentials in Supabase secrets.');
+      // On deployed/GitHub Pages — no local server available. Throw the specific error from Supabase.
+      throw new Error(`SMS failed: ${supabaseError}`);
     }
     try {
       const response = await fetch(`${BACKEND_URL}/send-bulk-sms`, {
@@ -375,6 +380,7 @@ export async function sendBulkSmsViaEdge({ recipients, message, senderName }) {
   // Normalize all recipient phone numbers to E.164 format
   const normalizedRecipients = recipients.map(normalizePhoneNumber);
 
+  let supabaseError = null;
   if (isSupabaseConfigured()) {
     try {
       const response = await fetch(`${SUPABASE_URL}/functions/v1/send-bulk-sms`, {
@@ -400,10 +406,14 @@ export async function sendBulkSmsViaEdge({ recipients, message, senderName }) {
 
         return { ok: !allFailed, results, error: topError };
       }
-      console.warn('Supabase bulk SMS failed, trying local backend fallback:', response.status);
+      supabaseError = data.error || `HTTP ${response.status}: ${response.statusText}`;
+      console.warn('Supabase bulk SMS failed:', supabaseError);
     } catch (err) {
-      console.warn('Supabase bulk SMS failed, trying local backend fallback:', err.message);
+      supabaseError = err.message;
+      console.warn('Supabase bulk SMS failed:', err.message);
     }
+  } else {
+    supabaseError = 'Supabase configuration is missing. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY/VITE_SUPABASE_PUBLISHABLE_KEY in your GitHub Repository secrets.';
   }
 
   // Local Node.js server fallback (port 5000) — only works when running locally
@@ -411,7 +421,7 @@ export async function sendBulkSmsViaEdge({ recipients, message, senderName }) {
   if (isDeployed) {
     return {
       ok: false,
-      error: 'SMS service unavailable: Supabase Edge Function failed. Please verify your Twilio credentials are set in Supabase secrets (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER).',
+      error: `SMS service unavailable: ${supabaseError}`,
     };
   }
 
