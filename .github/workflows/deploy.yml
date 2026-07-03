@@ -32,6 +32,7 @@ jobs:
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
@@ -68,11 +69,11 @@ jobs:
         run: supabase link --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
       - name: Deploy Edge Functions
         run: |
-          supabase functions deploy send-bulk-sms --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
-          supabase functions deploy send-sms --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
-          supabase functions deploy send-whatsapp --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
-          supabase functions deploy log-reminder --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
-          supabase functions deploy send-reminder --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+          supabase functions deploy send-bulk-sms --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} --no-verify-jwt
+          supabase functions deploy send-sms --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} --no-verify-jwt
+          supabase functions deploy send-whatsapp --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} --no-verify-jwt
+          supabase functions deploy log-reminder --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} --no-verify-jwt
+          supabase functions deploy send-reminder --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} --no-verify-jwt
       - name: Set Edge Function Secrets
         run: |
           supabase secrets set TWILIO_ACCOUNT_SID="${{ secrets.TWILIO_ACCOUNT_SID }}" --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}

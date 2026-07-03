@@ -249,7 +249,12 @@ export async function sendReminderViaEdge({ to, method, message, userId }) {
       }
     }
 
-    // Local Node.js server fallback (port 5000)
+    // Local Node.js server fallback (port 5000) — only works when running locally
+    const isDeployed = typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
+    if (isDeployed) {
+      // On deployed/GitHub Pages — no local server available
+      throw new Error('SMS failed: Supabase Edge Function returned an error. Please check Supabase Edge Function logs or verify your Twilio credentials in Supabase secrets.');
+    }
     try {
       const response = await fetch(`${BACKEND_URL}/send-bulk-sms`, {
         method: 'POST',
@@ -266,7 +271,8 @@ export async function sendReminderViaEdge({ to, method, message, userId }) {
       }
       return { ok: true, sid: singleResult?.sid || null };
     } catch (err) {
-      throw new Error(`SMS failed: ${err.message}. Make sure the local backend server (port 5000) is running and configured.`);
+      if (err.message.startsWith('SMS failed:')) throw err;
+      throw new Error(`SMS failed: ${err.message}. Make sure the local backend server (port 5000) is running.`);
     }
   } catch (err) {
     throw err; // Re-throw so sendReminder() catches it and shows error chip in UI
@@ -289,6 +295,7 @@ async function callSupabaseFunction(functionName, payload) {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        'apikey': SUPABASE_ANON_KEY,
       },
       body: JSON.stringify(payload),
     });
@@ -362,6 +369,7 @@ export async function sendBulkSmsViaEdge({ recipients, message, senderName }) {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'apikey': SUPABASE_ANON_KEY,
         },
         body: JSON.stringify({ recipients: normalizedRecipients, message, senderName }),
       });
@@ -384,7 +392,15 @@ export async function sendBulkSmsViaEdge({ recipients, message, senderName }) {
     }
   }
 
-  // Local Node.js server fallback (port 5000)
+  // Local Node.js server fallback (port 5000) — only works when running locally
+  const isDeployed = typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
+  if (isDeployed) {
+    return {
+      ok: false,
+      error: 'SMS service unavailable: Supabase Edge Function failed. Please verify your Twilio credentials are set in Supabase secrets (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER).',
+    };
+  }
+
   try {
     const response = await fetch(`${BACKEND_URL}/send-bulk-sms`, {
       method: 'POST',
