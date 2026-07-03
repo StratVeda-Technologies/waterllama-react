@@ -70,8 +70,10 @@ jobs:
           supabase functions deploy log-reminder --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
       - name: Set Edge Function Secrets
         run: |
-          supabase secrets set TWILIO_ACCOUNT_SID=${{ secrets.TWILIO_ACCOUNT_SID }} --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
-          supabase secrets set TWILIO_AUTH_TOKEN=${{ secrets.TWILIO_AUTH_TOKEN }} --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
-          supabase secrets set TWILIO_PHONE_NUMBER=${{ secrets.TWILIO_PHONE_NUMBER }} --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
-          supabase secrets set TWILIO_MESSAGING_SERVICE_SID=${{ secrets.TWILIO_MESSAGING_SERVICE_SID }} --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
-          supabase secrets set SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }} --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+          supabase secrets set TWILIO_ACCOUNT_SID="${{ secrets.TWILIO_ACCOUNT_SID }}" --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+          supabase secrets set TWILIO_AUTH_TOKEN="${{ secrets.TWILIO_AUTH_TOKEN }}" --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+          supabase secrets set TWILIO_PHONE_NUMBER="${{ secrets.TWILIO_PHONE_NUMBER }}" --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+          if [ -n "${{ secrets.TWILIO_MESSAGING_SERVICE_SID }}" ]; then
+            supabase secrets set TWILIO_MESSAGING_SERVICE_SID="${{ secrets.TWILIO_MESSAGING_SERVICE_SID }}" --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+          fi
+          supabase secrets set SUPABASE_SERVICE_ROLE_KEY="${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
