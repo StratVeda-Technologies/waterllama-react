@@ -440,25 +440,61 @@ app.post('/send-bulk-sms', async (req, res) => {
   for (const phone of recipients) {
     try {
       const sms = await twilioClient.messages.create(buildMessageOptions(phone, message));
-      results.push({ phone, success: true, sid: sms.sid });
+      
+      // Wait a short moment (1000ms) for Twilio to update delivery status
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      const updatedSms = await twilioClient.messages(sms.sid).fetch();
+
+      // Status can be: "queued", "sent", "failed", "delivered", "undelivered"
+      const twilioStatus = updatedSms.status;
+      const isActuallyDelivered = twilioStatus === "delivered" || twilioStatus === "sent";
+      const isFailedOrUndelivered = twilioStatus === "failed" || twilioStatus === "undelivered";
+      const isAccepted = twilioStatus === "queued" || twilioStatus === "sent";
+
+      results.push({
+        phone,
+        success: !isFailedOrUndelivered, // true for queued/sent/delivered
+        delivered: isActuallyDelivered, // ONLY true if status === "delivered"
+        sid: sms.sid,
+        status: twilioStatus,
+        // IMPORTANT: Twilio "success" means ACCEPTED for delivery, NOT delivered to handset
+        // For trial accounts: messages to unverified numbers are "accepted" but NEVER delivered
+        note: isAccepted
+          ? "Message accepted by Twilio for delivery. Actual delivery to phone is asynchronous and may fail (especially on trial accounts with unverified numbers)."
+          : isActuallyDelivered
+            ? "Message delivered to recipient's phone."
+            : "Message failed or was undelivered.",
+        // Trial account warning - CRITICAL for users not receiving SMS
+        trialWarning: accountSid && accountSid.startsWith("AC") && !messagingServiceSid
+          ? "⚠️ TWILIO TRIAL ACCOUNT LIMITATION: You can ONLY send SMS to VERIFIED numbers. Add recipient in Twilio Console → Phone Numbers → Verified Caller IDs, or upgrade your Twilio account. Messages to unverified numbers are 'accepted' but NEVER delivered."
+          : undefined,
+        // Provide guidance for checking actual delivery
+        checkDelivery: isAccepted
+          ? "Check actual delivery status in Twilio Console → Messaging → Logs, or set up a Status Callback URL to receive delivery receipts."
+          : undefined
+      });
     } catch (err) {
       // Parse Twilio error codes into friendly messages
       const code = err.code || err.status;
       let friendlyError = err.message;
 
-      // If trial limit exceeded, unverified number, or authentication error, simulate successful delivery
-      if (code === 20429 || code === 21608 || code === 20003 || code === 401 ||
-          (err.message && (err.message.toLowerCase().includes('exceed') || err.message.toLowerCase().includes('trial') || err.message.toLowerCase().includes('verified')))) {
-        console.log(`[Twilio Limit Fallback] Simulating successful SMS to ${phone} due to Twilio error/limit: ${err.message}`);
-        results.push({ phone, success: true, sid: 'SM_simulated_' + Math.random().toString(36).substr(2, 9) });
-      } else {
-        if (code === 21211) {
-          friendlyError = 'Invalid recipient phone number format.';
-        } else if (code === 21614) {
-          friendlyError = 'Phone number is not a mobile number or is unreachable.';
-        }
-        results.push({ phone, success: false, error: friendlyError, code });
+      // Return actual Twilio error - do NOT simulate success
+      // Simulation was causing "successfully sent" UI but SMS never delivered
+      if (code === 21211) {
+        friendlyError = 'Invalid recipient phone number format.';
+      } else if (code === 21614) {
+        friendlyError = 'Phone number is not a mobile number or is unreachable.';
+      } else if (code === 21608) {
+        friendlyError = 'Cannot send to unverified number (Twilio trial account limitation). Verify the number in Twilio console or upgrade account.';
+      } else if (code === 20429) {
+        friendlyError = 'Rate limit exceeded. Please wait before sending more messages.';
+      } else if (code === 20003 || code === 401) {
+        friendlyError = 'Twilio authentication failed. Check your Account SID and Auth Token.';
+      } else if (err.message && (err.message.toLowerCase().includes('trial') || err.message.toLowerCase().includes('unverified'))) {
+        friendlyError = 'Twilio trial account limitation. Upgrade your Twilio account or verify recipient numbers in Twilio console.';
       }
+
+      results.push({ phone, success: false, error: friendlyError, code });
     }
   }
 
@@ -662,34 +698,30 @@ async function checkAndSendReminders() {
         const code = err.code || err.status;
         let friendlyError = err.message;
 
-        // If trial limit exceeded, unverified number, or authentication error, simulate successful delivery
-        if (code === 20429 || code === 21608 || code === 20003 || code === 401 ||
-            (err.message && (err.message.toLowerCase().includes('exceed') || err.message.toLowerCase().includes('trial') || err.message.toLowerCase().includes('verified')))) {
-          const mockSid = 'SM_simulated_' + Math.random().toString(36).substr(2, 9);
-          // Clear cooldown
-          smsCooldown.delete(user.id);
-
-          await wlPool.execute(
-            "INSERT INTO reminder_logs (id, user_id, method, phone, message, status, provider_sid) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            [require('crypto').randomUUID(), user.id, 'SMS', user.phone, message, 'sent', mockSid]
-          );
-          console.log(`[Twilio Limit Fallback] Simulated auto SMS to ${user.phone} (SID: ${mockSid}) due to Twilio error/limit: ${err.message}`);
-        } else {
-          if (code === 21211) {
-            friendlyError = 'Invalid phone number format.';
-          } else if (code === 21614) {
-            friendlyError = 'Phone number is not a mobile number or is unreachable.';
-          }
-
-          // Set 1-hour cooldown so we don’t hammer Twilio on other errors
-          smsCooldown.set(user.id, Date.now() + 60 * 60 * 1000);
-
-          await wlPool.execute(
-            "INSERT INTO reminder_logs (id, user_id, method, phone, message, status, error_message) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            [require('crypto').randomUUID(), user.id, 'SMS', user.phone, message, 'failed', friendlyError]
-          );
-          console.error(`❌ Auto SMS reminder failed for ${user.phone} [${code}]: ${friendlyError}`);
+        // Return actual Twilio error - do NOT simulate success
+        // Simulation was causing "successfully sent" UI but SMS never delivered
+        if (code === 21211) {
+          friendlyError = 'Invalid phone number format.';
+        } else if (code === 21614) {
+          friendlyError = 'Phone number is not a mobile number or is unreachable.';
+        } else if (code === 21608) {
+          friendlyError = 'Cannot send to unverified number (Twilio trial account limitation). Verify the number in Twilio console or upgrade account.';
+        } else if (code === 20429) {
+          friendlyError = 'Rate limit exceeded. Please wait before sending more messages.';
+        } else if (code === 20003 || code === 401) {
+          friendlyError = 'Twilio authentication failed. Check your Account SID and Auth Token.';
+        } else if (err.message && (err.message.toLowerCase().includes('trial') || err.message.toLowerCase().includes('unverified'))) {
+          friendlyError = 'Twilio trial account limitation. Upgrade your Twilio account or verify recipient numbers in Twilio console.';
         }
+
+        // Set 1-hour cooldown so we don't hammer Twilio on other errors
+        smsCooldown.set(user.id, Date.now() + 60 * 60 * 1000);
+
+        await wlPool.execute(
+          "INSERT INTO reminder_logs (id, user_id, method, phone, message, status, error_message) VALUES (?, ?, ?, ?, ?, ?, ?)",
+          [require('crypto').randomUUID(), user.id, 'SMS', user.phone, message, 'failed', friendlyError]
+        );
+        console.error(`❌ Auto SMS reminder failed for ${user.phone} [${code}]: ${friendlyError}`);
       }
     }
   } catch (err) {

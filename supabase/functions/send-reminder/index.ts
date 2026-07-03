@@ -38,8 +38,9 @@ serve(async (req) => {
 
     const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID')
     const authToken  = Deno.env.get('TWILIO_AUTH_TOKEN')
-    const fromSms    = Deno.env.get('TWILIO_FROM_SMS')
-    const fromWa     = Deno.env.get('TWILIO_FROM_WHATSAPP') ?? 'whatsapp:+14155238886'
+    // Support both TWILIO_FROM_SMS and TWILIO_PHONE_NUMBER (whichever is set in Supabase secrets)
+    const fromSms    = Deno.env.get('TWILIO_FROM_SMS') || Deno.env.get('TWILIO_PHONE_NUMBER')
+    const fromWa     = Deno.env.get('TWILIO_FROM_WHATSAPP') || Deno.env.get('TWILIO_FROM_SMS') || Deno.env.get('TWILIO_PHONE_NUMBER') || 'whatsapp:+14155238886'
 
     if (!accountSid || !authToken) {
       return new Response(

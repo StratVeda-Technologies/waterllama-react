@@ -8,6 +8,7 @@ import {
   sendReminderViaEdge,
   dbReady,
   isSupabaseConfigured,
+  normalizePhoneNumber,
 } from './mysqlClient'
 import './App.css'
 import BulkSms from './BulkSms'
@@ -174,7 +175,7 @@ function App() {
   const xp = Math.floor(total / 50) + streak * 20
   const week = [...weekSeed, total]
   const tabs = ['onboarding', 'dashboard', 'reminders', 'stats', 'premium', 'bulk-sms']
-  const cleanPhone = phone.replace(/[^\d+]/g, '')
+  const cleanPhone = normalizePhoneNumber(phone)
   const reminderMessage = `Hi ${userName || 'there'}, time to drink water. You have completed ${Math.round(progress)}% of your ${formatLiters(goal)} hydration goal today.`
 
   const formattedExpiry = useMemo(() => {
@@ -358,12 +359,13 @@ function App() {
 
     try {
       // Use sendReminderViaEdge for both WhatsApp and SMS
-      // For WhatsApp: uses wa.me links (client-side, no backend)
-      // For SMS: uses Supabase Edge Functions → Twilio
+      // For WhatsApp: uses wa.me links (client-side, no backend needed)
+      // For SMS: uses Supabase Edge Functions → Twilio (send-reminder function)
       const result = await sendReminderViaEdge({
-        phone: cleanPhone,
+        to: cleanPhone,
         message: reminderMessage,
-        method: notificationMethod.toLowerCase(), // 'whatsapp' or 'sms'
+        method: notificationMethod, // 'WhatsApp' or 'SMS'
+        userId: userId || undefined,
       })
 
       const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -383,10 +385,12 @@ function App() {
         result.waLinks.forEach(link => window.open(link, '_blank', 'noopener,noreferrer'))
       }
     } catch (err) {
+      // sendReminderViaEdge throws for SMS failures — catch here to show error chip in UI
       console.error(`sendReminder ${notificationMethod} error:`, err)
-      setAutoSendError(err.message ?? `Could not send ${notificationMethod}`)
+      const errMsg = err?.message ?? `Could not send ${notificationMethod}`
+      setAutoSendError(errMsg)
       setAutoSendStatus('error')
-      setTimeout(() => setAutoSendStatus('idle'), 6000)
+      setTimeout(() => setAutoSendStatus('idle'), 8000)
     }
   }
 
@@ -859,7 +863,11 @@ function App() {
                   disabled={autoSendStatus === 'sending' || !cleanPhone}
                   onClick={() => sendReminder()}
                 >
-                  {autoSendStatus === 'sending' ? 'Opening…' : 'Send WhatsApp now'}
+                  {autoSendStatus === 'sending'
+                    ? `Sending ${notificationMethod}…`
+                    : notificationMethod === 'SMS'
+                      ? `📲 Send SMS now`
+                      : `📱 Send WhatsApp now`}
                 </button>
                 <button
                   className="secondary-action"
@@ -922,6 +930,17 @@ function App() {
                   For auto-reminders, SMS users will receive messages automatically every {reminderGap} hours.
                   WhatsApp auto-reminders open wa.me links (requires app to be open).
                 </p>
+                <div style={{ marginTop: '12px', padding: '12px', background: '#fffbeb', borderRadius: '8px', border: '1px solid #fde68a' }}>
+                  <p style={{ fontSize: '0.8rem', fontWeight: 700, marginBottom: '8px', color: '#92400e' }}>
+                    ⚠️ IMPORTANT: Twilio Trial Account Limitation
+                  </p>
+                  <p style={{ fontSize: '0.75rem', color: '#78350f', margin: 0 }}>
+                    <b>Trial accounts can ONLY send SMS to verified numbers.</b>
+                    Add recipient numbers in <b>Twilio Console → Phone Numbers → Verified Caller IDs</b>.
+                    <br/>Messages to unverified numbers are "accepted" by Twilio but <b>NEVER delivered</b>.
+                    <br/>Check actual delivery in <b>Twilio Console → Messaging → Logs</b>.
+                  </p>
+                </div>
               </div>
             </section>
           </div>

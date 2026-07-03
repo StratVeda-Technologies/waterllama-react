@@ -29,6 +29,72 @@ export function isSupabaseConfigured() {
   return !!(SUPABASE_URL && SUPABASE_ANON_KEY);
 }
 
+/**
+ * Normalize phone number to E.164 format
+ * Handles common formats and adds country code for Indian numbers
+ */
+export function normalizePhoneNumber(phone) {
+  if (!phone) return '';
+
+  // Remove all non-digits except +
+  let cleaned = String(phone).replace(/[^\d+]/g, '');
+
+  // If already has + prefix, return as-is (assuming valid E.164)
+  if (cleaned.startsWith('+')) {
+    return cleaned;
+  }
+
+  // If starts with 00, replace with +
+  if (cleaned.startsWith('00')) {
+    return '+' + cleaned.substring(2);
+  }
+
+  // If starts with country code but no +, add it
+  // Common patterns: 91xxxxxxxxxx (India), 1xxxxxxxxxx (US/Canada)
+  if (cleaned.length >= 10) {
+    // India numbers: 10 digits starting with 6-9
+    if (cleaned.length === 10 && /^[6-9]\d{9}$/.test(cleaned)) {
+      return '+91' + cleaned;
+    }
+    // US/Canada: 10 digits or 11 digits starting with 1
+    if (cleaned.length === 10) {
+      return '+1' + cleaned; // Default to US
+    }
+    if (cleaned.length === 11 && cleaned.startsWith('1')) {
+      return '+' + cleaned;
+    }
+    // If 12+ digits, assume it has country code
+    if (cleaned.length >= 11) {
+      return '+' + cleaned;
+    }
+  }
+
+  // Default: assume it's a local number, prepend +
+  return '+' + cleaned;
+}
+
+/**
+ * Validate phone number is in E.164 format
+ */
+export function isValidE164Phone(phone) {
+  return /^\+\d{10,15}$/.test(normalizePhoneNumber(phone));
+}
+
+/**
+ * Get phone number display format (e.g., +91 98765 43210)
+ */
+export function formatPhoneForDisplay(phone) {
+  const normalized = normalizePhoneNumber(phone);
+  // Format: +91 98765 43210
+  if (normalized.startsWith('+91') && normalized.length === 13) {
+    return normalized.replace(/(\+91)(\d{5})(\d{5})/, '$1 $2 $3');
+  }
+  if (normalized.startsWith('+1') && normalized.length === 12) {
+    return normalized.replace(/(\+1)(\d{3})(\d{3})(\d{4})/, '$1 ($2) $3-$4');
+  }
+  return normalized;
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────
 const STORAGE_KEY = 'aqualama-state';
 
@@ -148,40 +214,69 @@ export async function logRemoteReminder({ userId, method, phone, message, status
 /**
  * Send reminder - WhatsApp works client-side, SMS via Supabase Edge Functions (when configured)
  */
+const BACKEND_URL = import.meta.env?.VITE_API_URL || 'http://localhost:5000';
+
 export async function sendReminderViaEdge({ to, method, message, userId }) {
+  // Normalize phone number to E.164 format before sending
+  const normalizedTo = normalizePhoneNumber(to);
+
   try {
     if (method === 'WhatsApp') {
       // Try Supabase Edge Function first (for actual WhatsApp via Twilio)
       if (isSupabaseConfigured()) {
-        const result = await callSupabaseFunction('send-whatsapp', { to, message, userId });
+        const result = await callSupabaseFunction('send-reminder', { to: normalizedTo, message, method: 'WhatsApp', userId });
         if (result.ok) return { ok: true, sid: result.sid };
-        // Fall back to wa.me if function fails
+        // Fall back to wa.me if edge function fails
         console.warn('Supabase WhatsApp failed, falling back to wa.me:', result.error);
       }
 
       // Fallback: wa.me link (always works client-side)
-      const rawPhone = to.replace(/^\+/, '');
+      const rawPhone = normalizedTo.replace(/^\+/, '');
       const encodedMsg = encodeURIComponent(message);
       const deeplink = `https://wa.me/${rawPhone}?text=${encodedMsg}`;
       window.open(deeplink, '_blank', 'noopener,noreferrer');
       return { ok: true, sid: null };
     }
 
-    // SMS: try Supabase Edge Function
+    // SMS: Try Supabase Edge Function first
     if (isSupabaseConfigured()) {
-      const result = await callSupabaseFunction('send-sms', { to, message });
-      return result;
+      try {
+        const result = await callSupabaseFunction('send-reminder', { to: normalizedTo, message, method: 'SMS', userId });
+        if (result.ok) return result;
+        console.warn('Supabase SMS reminder failed, trying local backend fallback:', result.error);
+      } catch (err) {
+        console.warn('Supabase SMS reminder failed, trying local backend fallback:', err.message);
+      }
     }
 
-    // Not configured - fallback message
-    return { ok: false, error: 'SMS requires Supabase configuration. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to .env.local or configure in Settings.' };
+    // Local Node.js server fallback (port 5000)
+    try {
+      const response = await fetch(`${BACKEND_URL}/send-bulk-sms`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recipients: [normalizedTo], message, senderName: 'Aqualama' }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || `HTTP ${response.status}`);
+      }
+      const singleResult = data[0] || data.results?.[0];
+      if (singleResult && !singleResult.success) {
+        throw new Error(singleResult.error || 'SMS failed');
+      }
+      return { ok: true, sid: singleResult?.sid || null };
+    } catch (err) {
+      throw new Error(`SMS failed: ${err.message}. Make sure the local backend server (port 5000) is running and configured.`);
+    }
   } catch (err) {
-    return { ok: false, error: err.message };
+    throw err; // Re-throw so sendReminder() catches it and shows error chip in UI
   }
 }
 
 /**
- * Call a Supabase Edge Function
+ * Call a Supabase Edge Function.
+ * Returns the full response body so Twilio errors (wrong number, trial limits,
+ * bad credentials) are surfaced in the UI instead of silently showing success.
  */
 async function callSupabaseFunction(functionName, payload) {
   if (!isSupabaseConfigured()) {
@@ -201,14 +296,17 @@ async function callSupabaseFunction(functionName, payload) {
     const data = await response.json();
 
     if (!response.ok) {
-      // Handle trial/unverified limits gracefully
-      if (data.simulated) {
-        return { ok: true, sid: data.sid, simulated: true };
-      }
-      return { ok: false, error: data.error || `HTTP ${response.status}` };
+      // HTTP-level failure (e.g. 401, 500 from the edge function itself)
+      return { ok: false, error: data.error || `HTTP ${response.status}: ${response.statusText}` };
     }
 
-    return { ok: true, sid: data.sid, simulated: data.simulated };
+    // Return the full response body so Twilio errors are not swallowed.
+    // Edge functions always return 200 with { ok: true/false } — check that field.
+    if (data.ok === false) {
+      return { ok: false, error: data.error || 'SMS send failed', ...data };
+    }
+
+    return { ok: true, ...data };
   } catch (err) {
     return { ok: false, error: err.message };
   }
@@ -248,39 +346,73 @@ export async function syncWaterEntriesToDB({ userId, logs, drinkFactors }) {
 }
 
 /**
- * Send bulk SMS - via Supabase Edge Function when configured
+ * Send bulk SMS — via Supabase Edge Function (send-bulk-sms) → Twilio.
+ * Returns { ok, results } where each result has: { phone, success, delivered, sid, status, error, note, trialWarning }
+ * 'success' means Twilio accepted the message for delivery (queued/sent).
+ * 'delivered' is true ONLY when Twilio confirms handset delivery (async, rarely immediate).
  */
 export async function sendBulkSmsViaEdge({ recipients, message, senderName }) {
-  if (!isSupabaseConfigured()) {
-    return {
-      ok: false,
-      error: 'Bulk SMS requires Supabase configuration. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to .env.local'
-    };
+  // Normalize all recipient phone numbers to E.164 format
+  const normalizedRecipients = recipients.map(normalizePhoneNumber);
+
+  if (isSupabaseConfigured()) {
+    try {
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/send-bulk-sms`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({ recipients: normalizedRecipients, message, senderName }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // data.results is an array — each entry has success/error per recipient
+        const results = data.results || [];
+        const allFailed = results.length > 0 && results.every(r => !r.success);
+        const topError = allFailed
+          ? (results[0]?.error || 'All messages failed. Check Twilio credentials and recipient numbers.')
+          : undefined;
+
+        return { ok: !allFailed, results, error: topError };
+      }
+      console.warn('Supabase bulk SMS failed, trying local backend fallback:', response.status);
+    } catch (err) {
+      console.warn('Supabase bulk SMS failed, trying local backend fallback:', err.message);
+    }
   }
 
+  // Local Node.js server fallback (port 5000)
   try {
-    const response = await fetch(`${SUPABASE_URL}/functions/v1/send-bulk-sms`, {
+    const response = await fetch(`${BACKEND_URL}/send-bulk-sms`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ recipients, message, senderName }),
+      body: JSON.stringify({ recipients: normalizedRecipients, message, senderName }),
     });
 
     const data = await response.json();
 
     if (!response.ok) {
-      // Handle trial limits
-      if (data.results?.some(r => r.simulated)) {
-        return { ok: true, results: data.results };
-      }
-      return { ok: false, error: data.error || `HTTP ${response.status}` };
+      return { ok: false, error: data.error || `HTTP ${response.status}: ${response.statusText}` };
     }
 
-    return { ok: true, results: data.results };
+    // The local backend returns an array: results = [{ phone, success, delivered, sid, status, error, note, trialWarning }, ...]
+    const results = Array.isArray(data) ? data : (data.results || []);
+    const allFailed = results.length > 0 && results.every(r => !r.success);
+    const topError = allFailed
+      ? (results[0]?.error || 'All messages failed.')
+      : undefined;
+
+    return { ok: !allFailed, results, error: topError };
   } catch (err) {
-    return { ok: false, error: err.message };
+    return {
+      ok: false,
+      error: `Local backend connection failed: ${err.message}. Make sure the local backend server (port 5000) is running and configured.`
+    };
   }
 }
 

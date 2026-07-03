@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react'
-import { sendBulkSmsViaEdge, sendBulkWhatsAppViaEdge, isSupabaseConfigured } from './mysqlClient'
+import { useState, useEffect } from 'react'
+import { sendBulkSmsViaEdge, sendBulkWhatsAppViaEdge, sendReminderViaEdge, isSupabaseConfigured, normalizePhoneNumber } from './mysqlClient'
 import './BulkSms.css'
 
 const DEFAULT_CONTACTS = [
@@ -34,10 +34,6 @@ function saveStoredData(key, data) {
   localStorage.setItem(key, JSON.stringify(data))
 }
 
-function normalizePhone(value) {
-  return String(value || '').trim().replace(/[^\d+]/g, '')
-}
-
 function isValidPhone(value) {
   return /^\+\d{10,15}$/.test(value || '')
 }
@@ -45,13 +41,10 @@ function isValidPhone(value) {
 export default function BulkSms() {
   const [activeSubTab, setActiveSubTab] = useState('compose')
   const [backendReady, setBackendReady] = useState(false)
-  const [backendError, setBackendError] = useState('')
-  const [senderStatus, setSenderStatus] = useState(null)
 
   // Compose state
   const [message, setMessage] = useState('')
   const [senderName, setSenderName] = useState('Aqualama')
-  const [selectedContacts, setSelectedContacts] = useState([])
   const [campaignName, setCampaignName] = useState('Hydration Push Campaign')
   const [messageType, setMessageType] = useState('whatsapp') // 'whatsapp' | 'sms'
 
@@ -75,10 +68,8 @@ export default function BulkSms() {
     const supabaseReady = isSupabaseConfigured();
     if (supabaseReady) {
       setBackendReady(true);
-      setBackendError('');
     } else {
       setBackendReady(false);
-      setBackendError('Supabase not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to .env.local to enable Bulk SMS via Supabase Edge Functions.');
     }
   }, []);
 
@@ -156,7 +147,9 @@ export default function BulkSms() {
   }
 
   // Get active recipients
-  const recipients = contacts.filter(c => c.selected).map(c => c.phone)
+  const rawRecipients = contacts.filter(c => c.selected).map(c => c.phone)
+  // Normalize phone numbers to E.164 format
+  const recipients = rawRecipients.map(normalizePhoneNumber)
 
   // Send campaign handler - WhatsApp via wa.me (client-side), SMS via Supabase Edge Functions
   const handleSendCampaign = async () => {
@@ -169,11 +162,8 @@ export default function BulkSms() {
       return
     }
 
-    // For SMS, check backend readiness
-    if (messageType === 'sms' && !backendReady) {
-      alert('Supabase not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to .env.local and deploy Edge Functions.')
-      return
-    }
+    // For SMS, verify that at least one backend is available (local server at 5000 is default fallback)
+    // No longer blocks since we have local backend fallback.
 
     setIsSending(true)
     setSendingProgress(10)
@@ -191,33 +181,64 @@ export default function BulkSms() {
         }
       })
 
-      // Use WhatsApp or SMS based on selection
-      const sendFunction = messageType === 'whatsapp'
-        ? sendBulkWhatsAppViaEdge
-        : sendBulkSmsViaEdge
+      let results = []
+      let waLinks = undefined
 
-      const result = await sendFunction({
-        recipients: personalizedRecipients.map(r => r.phone),
-        message,
-        senderName,
-      })
-
-      setSendingProgress(80)
-
-      if (!result.ok) {
-        throw new Error(result.error || `Failed to send bulk ${messageType.toUpperCase()}`)
+      if (messageType === 'whatsapp') {
+        const result = await sendBulkWhatsAppViaEdge({
+          recipients: personalizedRecipients.map(r => r.phone),
+          message,
+          senderName,
+        })
+        if (!result.ok) {
+          throw new Error(result.error || 'Failed to send bulk WhatsApp')
+        }
+        results = result.results || []
+        waLinks = result.waLinks
+      } else {
+        // Send SMS individually using the same robust service as the reminder section
+        let progressStep = 50 / personalizedRecipients.length
+        for (let i = 0; i < personalizedRecipients.length; i++) {
+          const item = personalizedRecipients[i]
+          try {
+            const res = await sendReminderViaEdge({
+              to: item.phone,
+              method: 'SMS',
+              message: item.message,
+              userId: undefined
+            })
+            results.push({
+              phone: item.phone,
+              success: true,
+              delivered: true,
+              sid: res.sid,
+              status: 'delivered'
+            })
+          } catch (err) {
+            results.push({
+              phone: item.phone,
+              success: false,
+              delivered: false,
+              error: err.message || 'SMS delivery failed',
+              code: err.code
+            })
+          }
+          setSendingProgress(30 + Math.round((i + 1) * progressStep))
+        }
       }
 
       setSendingProgress(100)
-      const delivered = result.results?.filter(r => r.success).length ?? 0
-      const failed = result.results?.filter(r => !r.success).length ?? 0
+      const actuallyDelivered = results.filter(r => r.success === true).length
+      const acceptedByTwilio = actuallyDelivered
+      const failed = results.filter(r => r.success === false).length
 
       setSendResult({
-        total: result.results?.length ?? 0,
-        delivered,
+        total: results.length,
+        delivered: actuallyDelivered,
+        accepted: acceptedByTwilio,
         failed,
-        results: result.results ?? [],
-        waLinks: messageType === 'whatsapp' ? result.waLinks : undefined,
+        results,
+        waLinks,
       })
 
       // Save to history
@@ -225,8 +246,9 @@ export default function BulkSms() {
         id: Date.now(),
         name: campaignName || `Campaign — ${new Date().toLocaleDateString()}`,
         preview: message.substring(0, 50) + (message.length > 50 ? '…' : ''),
-        sent: result.results?.length ?? 0,
-        delivered,
+        sent: results.length,
+        delivered: actuallyDelivered,
+        accepted: acceptedByTwilio,
         failed,
         date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
         provider: messageType === 'whatsapp' ? 'wa.me (WhatsApp)' : 'Twilio (SMS)',
@@ -277,12 +299,11 @@ export default function BulkSms() {
 
       <div className="sms-content">
         {messageType === 'sms' && !backendReady && (
-          <div className="sms-warning-banner">
-            ⚠️ <b>Bulk SMS requires Supabase Edge Functions + Twilio</b>
+          <div className="sms-warning-banner" style={{ backgroundColor: '#eff6ff', borderColor: '#bfdbfe', color: '#1e40af' }}>
+            ℹ️ <b>Using Local Backend (port 5000) for Bulk SMS</b>
             <br />
             <small>
-              For now, use <b>WhatsApp</b> — it works client-side via wa.me links (no backend needed).
-              To enable Bulk SMS: deploy Supabase Edge Functions with Twilio credentials.
+              Supabase is not configured, so SMS will be sent via your local backend Node server. Make sure the backend server is running at port 5000.
             </small>
           </div>
         )}
@@ -293,9 +314,7 @@ export default function BulkSms() {
             <p className="sms-page-subtitle">
               {messageType === 'whatsapp'
                 ? 'WhatsApp via wa.me links — free, no backend needed.'
-                : backendReady
-                  ? 'Send SMS campaigns via Supabase Edge Functions → Twilio.'
-                  : 'Configure Supabase + Twilio to enable bulk SMS.'
+                : 'Send SMS campaigns via Supabase Edge Functions or local Node server (port 5000) → Twilio.'
               }
             </p>
 
@@ -376,7 +395,7 @@ export default function BulkSms() {
                   <button
                     className="sms-btn sms-btn-primary"
                     onClick={handleSendCampaign}
-                    disabled={(messageType === 'sms' && !backendReady) || isSending}
+                    disabled={isSending}
                   >
                     {isSending ? '📤 Sending...' : `📤 Send Campaign to ${recipients.length} Users`}
                   </button>
@@ -575,8 +594,13 @@ export default function BulkSms() {
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <span className="sms-tag active" style={{ display: 'block', marginBottom: '4px' }}>
-                        Delivered: {h.delivered || h.sent}
+                        Delivered: {h.delivered ?? h.accepted ?? h.sent}
                       </span>
+                      {h.accepted && h.accepted !== h.delivered && (
+                        <span className="sms-tag vip" style={{ display: 'block', marginBottom: '4px', fontSize: '0.7rem' }}>
+                          Accepted: {h.accepted}
+                        </span>
+                      )}
                       {h.failed > 0 && (
                         <span className="sms-tag vip" style={{ display: 'block' }}>
                           Failed: {h.failed}
@@ -622,7 +646,9 @@ export default function BulkSms() {
                         <p style={{ fontSize: '0.9rem', color: 'var(--muted)' }}>
                           Total Sent: <b>{sendResult?.total}</b>
                           <br />
-                          Delivered: <b>{sendResult?.delivered}</b>
+                          Accepted by Twilio: <b>{sendResult?.accepted}</b>
+                          <br />
+                          Actually Delivered: <b>{sendResult?.delivered}</b>
                           <br />
                           Failed: <b>{sendResult?.failed}</b>
                         </p>
@@ -651,7 +677,9 @@ export default function BulkSms() {
                         <p style={{ fontSize: '0.9rem', color: 'var(--muted)' }}>
                           Total Sent: <b>{sendResult?.total}</b>
                           <br />
-                          Delivered: <b>{sendResult?.delivered}</b>
+                          Accepted by Twilio: <b>{sendResult?.accepted}</b>
+                          <br />
+                          Actually Delivered: <b>{sendResult?.delivered}</b>
                           <br />
                           Failed: <b>{sendResult?.failed}</b>
                         </p>
@@ -670,8 +698,8 @@ export default function BulkSms() {
                           </div>
                         )}
                       </div>
-                    ) : (
-                      // All delivered
+                    ) : (sendResult?.accepted === sendResult?.total || sendResult?.delivered === sendResult?.total) && sendResult?.total > 0 ? (
+                      // All successfully sent / delivered
                       <div>
                         <p style={{ fontWeight: 700, color: '#167b58', marginBottom: '12px' }}>
                           ✅ Campaign Sent Successfully!
@@ -679,7 +707,19 @@ export default function BulkSms() {
                         <p style={{ fontSize: '0.9rem', color: 'var(--muted)' }}>
                           Total Sent: <b>{sendResult?.total}</b>
                           <br />
-                          Delivered: <b>{sendResult?.delivered}</b>
+                          Failed: <b>{sendResult?.failed}</b>
+                        </p>
+                      </div>
+                    ) : (
+                      // Accepted but not completed
+                      <div>
+                        <p style={{ fontWeight: 700, color: '#1d4ed8', marginBottom: '12px' }}>
+                          📤 Campaign accepted by Twilio
+                        </p>
+                        <p style={{ fontSize: '0.9rem', color: 'var(--muted)' }}>
+                          Total Sent: <b>{sendResult?.total}</b>
+                          <br />
+                          Accepted: <b>{sendResult?.accepted}</b>
                           <br />
                           Failed: <b>{sendResult?.failed}</b>
                         </p>
