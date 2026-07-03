@@ -1,10 +1,9 @@
 // Supabase Edge Function — send-reminder
-// Deploy: supabase functions deploy send-reminder
-// Secrets needed (Supabase dashboard → Project → Edge Functions → Secrets):
-//   TWILIO_ACCOUNT_SID
-//   TWILIO_AUTH_TOKEN
-//   TWILIO_FROM_SMS        e.g. +14155552671
-//   TWILIO_FROM_WHATSAPP   e.g. whatsapp:+14155238886  (Twilio sandbox default)
+// Deploy: supabase functions deploy send-reminder --no-verify-jwt
+//
+// Priority for Twilio credentials:
+//   1. Supabase secrets (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER)
+//   2. Fallback credentials passed in request body (from VITE_TWILIO_* env vars baked into frontend build)
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 
@@ -27,7 +26,8 @@ serve(async (req) => {
   }
 
   try {
-    const { to, method, message } = await req.json()
+    // Accept fallback credentials from request body (sent by frontend from VITE_TWILIO_* env vars)
+    const { to, method, message, _twilioSid, _twilioToken, _twilioFrom } = await req.json()
 
     if (!to || !message) {
       return new Response(
@@ -36,15 +36,16 @@ serve(async (req) => {
       )
     }
 
-    const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID')
-    const authToken  = Deno.env.get('TWILIO_AUTH_TOKEN')
-    // Support both TWILIO_FROM_SMS and TWILIO_PHONE_NUMBER (whichever is set in Supabase secrets)
-    const fromSms    = Deno.env.get('TWILIO_FROM_SMS') || Deno.env.get('TWILIO_PHONE_NUMBER')
-    const fromWa     = Deno.env.get('TWILIO_FROM_WHATSAPP') || Deno.env.get('TWILIO_FROM_SMS') || Deno.env.get('TWILIO_PHONE_NUMBER') || 'whatsapp:+14155238886'
+    // Priority: Supabase secrets > request body fallback
+    const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID') || _twilioSid
+    const authToken  = Deno.env.get('TWILIO_AUTH_TOKEN')  || _twilioToken
+    const fromSms    = Deno.env.get('TWILIO_FROM_SMS') || Deno.env.get('TWILIO_PHONE_NUMBER') || _twilioFrom
+    const fromWaEnv  = Deno.env.get('TWILIO_FROM_WHATSAPP') || Deno.env.get('TWILIO_FROM_SMS') || Deno.env.get('TWILIO_PHONE_NUMBER')
+    const fromWa     = fromWaEnv || (_twilioFrom ? `whatsapp:${_twilioFrom}` : 'whatsapp:+14155238886')
 
     if (!accountSid || !authToken) {
       return new Response(
-        JSON.stringify({ ok: false, error: 'Twilio credentials not configured in Supabase secrets' }),
+        JSON.stringify({ ok: false, error: 'Twilio credentials not configured. Please set TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN in Supabase Edge Function secrets.' }),
         { status: 200, headers: { ...CORS, 'Content-Type': 'application/json' } },
       )
     }
@@ -58,12 +59,7 @@ serve(async (req) => {
 
     if (!fromParam) {
       return new Response(
-        JSON.stringify({
-          ok: false,
-          error: isWhatsApp
-            ? 'TWILIO_FROM_WHATSAPP secret not set'
-            : 'TWILIO_FROM_SMS secret not set',
-        }),
+        JSON.stringify({ ok: false, error: 'No sender phone number configured.' }),
         { status: 200, headers: { ...CORS, 'Content-Type': 'application/json' } },
       )
     }
@@ -84,18 +80,19 @@ serve(async (req) => {
 
     if (!twilioRes.ok) {
       console.error('Twilio error:', twilioData)
+      let friendlyError = twilioData.message ?? 'Twilio API error'
+      if (twilioData.code === 21608) {
+        friendlyError = 'Cannot send to unverified number (Twilio trial account). Verify the number in Twilio Console → Verified Caller IDs.'
+      } else if (twilioData.code === 21211) {
+        friendlyError = 'Invalid phone number format. Use international format with country code (e.g. +919876543210).'
+      }
       return new Response(
-        JSON.stringify({
-          ok: false,
-          error: twilioData.message ?? 'Twilio API error',
-          code: twilioData.code,
-        }),
-        // Always 200 so Supabase invoke puts the body in `data`, not `error`
+        JSON.stringify({ ok: false, error: friendlyError, code: twilioData.code }),
         { status: 200, headers: { ...CORS, 'Content-Type': 'application/json' } },
       )
     }
 
-    return new Response(JSON.stringify({ ok: true, sid: twilioData.sid }), {
+    return new Response(JSON.stringify({ ok: true, sid: twilioData.sid, status: twilioData.status }), {
       status: 200,
       headers: { ...CORS, 'Content-Type': 'application/json' },
     })

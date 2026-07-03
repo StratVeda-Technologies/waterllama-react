@@ -14,6 +14,18 @@ export const dbReady = false;
 let SUPABASE_URL = import.meta.env?.VITE_SUPABASE_URL || localStorage.getItem('supabase_url') || '';
 let SUPABASE_ANON_KEY = import.meta.env?.VITE_SUPABASE_ANON_KEY || import.meta.env?.VITE_SUPABASE_PUBLISHABLE_KEY || localStorage.getItem('supabase_anon_key') || localStorage.getItem('supabase_publishable_key') || '';
 
+// Twilio credentials baked into build from VITE_TWILIO_* env vars.
+// Passed to edge functions as fallback when Supabase secrets are not configured.
+const TWILIO_SID   = import.meta.env?.VITE_TWILIO_ACCOUNT_SID  || '';
+const TWILIO_TOKEN = import.meta.env?.VITE_TWILIO_AUTH_TOKEN    || '';
+const TWILIO_FROM  = import.meta.env?.VITE_TWILIO_PHONE_NUMBER  || '';
+
+// Helper: returns Twilio fallback payload fields (only if we have values)
+function twilioFallback() {
+  if (!TWILIO_SID || !TWILIO_TOKEN) return {};
+  return { _twilioSid: TWILIO_SID, _twilioToken: TWILIO_TOKEN, _twilioFrom: TWILIO_FROM };
+}
+
 export function setSupabaseConfig(url, key) {
   SUPABASE_URL = url;
   SUPABASE_ANON_KEY = key;
@@ -297,7 +309,8 @@ async function callSupabaseFunction(functionName, payload) {
         'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
         'apikey': SUPABASE_ANON_KEY,
       },
-      body: JSON.stringify(payload),
+      // Merge Twilio fallback into payload so edge function can use them if secrets aren't set
+      body: JSON.stringify({ ...payload, ...twilioFallback() }),
     });
 
     const data = await response.json();
@@ -371,7 +384,8 @@ export async function sendBulkSmsViaEdge({ recipients, message, senderName }) {
           'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
           'apikey': SUPABASE_ANON_KEY,
         },
-        body: JSON.stringify({ recipients: normalizedRecipients, message, senderName }),
+        // Merge Twilio fallback into payload so edge function can use them if secrets aren't set
+        body: JSON.stringify({ recipients: normalizedRecipients, message, senderName, ...twilioFallback() }),
       });
 
       const data = await response.json();
