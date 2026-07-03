@@ -7,9 +7,9 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 declare const Deno: { env: { get: (key: string) => string | undefined } };
 
 // Priority for Twilio credentials:
-//   1. Supabase secrets (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER)
-//   2. Fallback credentials passed in request body (_twilioSid, _twilioToken, _twilioFrom)
-//      — these come from VITE_TWILIO_* env vars baked into the frontend build
+//   1. Fallback credentials passed in request body (_twilioSid, _twilioToken, _twilioFrom)
+//      - these come from VITE_TWILIO_* env vars baked into the frontend build
+//   2. Supabase secrets (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER)
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -32,15 +32,15 @@ serve(async (req: Request) => {
       );
     }
 
-    // Priority: Supabase secrets > request body fallback
-    const accountSid = Deno.env.get("TWILIO_ACCOUNT_SID") || _twilioSid;
-    const authToken  = Deno.env.get("TWILIO_AUTH_TOKEN")  || _twilioToken;
-    const fromNumber = Deno.env.get("TWILIO_PHONE_NUMBER") || _twilioFrom;
+    // Prioritize credentials sent by frontend (_twilioSid) over Supabase environment secrets
+    const accountSid = _twilioSid || Deno.env.get("TWILIO_ACCOUNT_SID");
+    const authToken  = _twilioToken || Deno.env.get("TWILIO_AUTH_TOKEN");
+    const fromNumber = _twilioFrom || Deno.env.get("TWILIO_PHONE_NUMBER");
     const serviceSid = Deno.env.get("TWILIO_MESSAGING_SERVICE_SID");
 
     if (!accountSid || !authToken) {
       return new Response(
-        JSON.stringify({ error: "Twilio credentials not configured. Set TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN in Supabase Edge Function secrets." }),
+        JSON.stringify({ error: "Twilio credentials not configured. Please set TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN." }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

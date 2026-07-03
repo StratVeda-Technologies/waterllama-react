@@ -2,8 +2,8 @@
 // Deploy: supabase functions deploy send-reminder --no-verify-jwt
 //
 // Priority for Twilio credentials:
-//   1. Supabase secrets (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER)
-//   2. Fallback credentials passed in request body (from VITE_TWILIO_* env vars baked into frontend build)
+//   1. Fallback credentials passed in request body (_twilioSid, _twilioToken, _twilioFrom)
+//   2. Supabase secrets (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER)
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 
@@ -26,7 +26,6 @@ serve(async (req) => {
   }
 
   try {
-    // Accept fallback credentials from request body (sent by frontend from VITE_TWILIO_* env vars)
     const { to, method, message, _twilioSid, _twilioToken, _twilioFrom } = await req.json()
 
     if (!to || !message) {
@@ -36,16 +35,16 @@ serve(async (req) => {
       )
     }
 
-    // Priority: Supabase secrets > request body fallback
-    const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID') || _twilioSid
-    const authToken  = Deno.env.get('TWILIO_AUTH_TOKEN')  || _twilioToken
-    const fromSms    = Deno.env.get('TWILIO_FROM_SMS') || Deno.env.get('TWILIO_PHONE_NUMBER') || _twilioFrom
+    // Prioritize credentials sent by frontend (_twilioSid) over Supabase environment secrets
+    const accountSid = _twilioSid || Deno.env.get('TWILIO_ACCOUNT_SID')
+    const authToken  = _twilioToken || Deno.env.get('TWILIO_AUTH_TOKEN')
+    const fromSms    = _twilioFrom || Deno.env.get('TWILIO_FROM_SMS') || Deno.env.get('TWILIO_PHONE_NUMBER')
     const fromWaEnv  = Deno.env.get('TWILIO_FROM_WHATSAPP') || Deno.env.get('TWILIO_FROM_SMS') || Deno.env.get('TWILIO_PHONE_NUMBER')
-    const fromWa     = fromWaEnv || (_twilioFrom ? `whatsapp:${_twilioFrom}` : 'whatsapp:+14155238886')
+    const fromWa     = _twilioFrom ? `whatsapp:${_twilioFrom}` : (fromWaEnv || 'whatsapp:+14155238886')
 
     if (!accountSid || !authToken) {
       return new Response(
-        JSON.stringify({ ok: false, error: 'Twilio credentials not configured. Please set TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN in Supabase Edge Function secrets.' }),
+        JSON.stringify({ ok: false, error: 'Twilio credentials not configured. Please set TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN.' }),
         { status: 200, headers: { ...CORS, 'Content-Type': 'application/json' } },
       )
     }
