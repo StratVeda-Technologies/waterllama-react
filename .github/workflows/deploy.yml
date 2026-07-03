@@ -47,6 +47,10 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+        with:
+          # Retry on transient failures (GitHub Pages "try again later" error)
+          retries: 3
+          retry_wait: 30
 
   # Deploy Supabase Edge Functions (requires Supabase CLI and secrets)
   deploy-edge-functions:
