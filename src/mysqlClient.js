@@ -10,8 +10,9 @@
 export const dbReady = false;
 
 // Supabase configuration (set these in .env.local or localStorage for production)
+// Supports both VITE_SUPABASE_ANON_KEY (legacy) and VITE_SUPABASE_PUBLISHABLE_KEY (new format)
 let SUPABASE_URL = import.meta.env?.VITE_SUPABASE_URL || localStorage.getItem('supabase_url') || '';
-let SUPABASE_ANON_KEY = import.meta.env?.VITE_SUPABASE_ANON_KEY || localStorage.getItem('supabase_anon_key') || '';
+let SUPABASE_ANON_KEY = import.meta.env?.VITE_SUPABASE_ANON_KEY || import.meta.env?.VITE_SUPABASE_PUBLISHABLE_KEY || localStorage.getItem('supabase_anon_key') || localStorage.getItem('supabase_publishable_key') || '';
 
 export function setSupabaseConfig(url, key) {
   SUPABASE_URL = url;
