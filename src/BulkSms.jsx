@@ -612,16 +612,80 @@ export default function BulkSms() {
                   </div>
                 ) : (
                   <div>
-                    <p style={{ fontWeight: 700, color: '#167b58', marginBottom: '12px' }}>
-                      ✅ Campaign Sent Successfully!
-                    </p>
-                    <p style={{ fontSize: '0.9rem', color: 'var(--muted)' }}>
-                      Total Sent: <b>{sendResult?.total}</b>
-                      <br />
-                      Delivered: <b>{sendResult?.delivered}</b>
-                      <br />
-                      Failed: <b>{sendResult?.failed}</b>
-                    </p>
+                    {/* Determine overall status */}
+                    {sendResult?.failed === sendResult?.total && sendResult?.total > 0 ? (
+                      // All failed
+                      <div>
+                        <p style={{ fontWeight: 700, color: '#dc2626', marginBottom: '12px' }}>
+                          ❌ Campaign Failed - No Messages Delivered
+                        </p>
+                        <p style={{ fontSize: '0.9rem', color: 'var(--muted)' }}>
+                          Total Sent: <b>{sendResult?.total}</b>
+                          <br />
+                          Delivered: <b>{sendResult?.delivered}</b>
+                          <br />
+                          Failed: <b>{sendResult?.failed}</b>
+                        </p>
+                        <div style={{ marginTop: '12px', padding: '12px', background: '#fef2f2', borderRadius: '8px', border: '1px solid #fecaca' }}>
+                          <p style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '8px', color: '#dc2626' }}>
+                            ⚠️ Twilio Trial Account Limitation
+                          </p>
+                          <p style={{ fontSize: '0.8rem', color: '#991b1b', marginBottom: '8px' }}>
+                            You're using a Twilio trial account. Trial accounts can <b>only send SMS to verified phone numbers</b>.
+                            Add recipient numbers in Twilio Console → Phone Numbers → Verified Caller IDs.
+                          </p>
+                          <p style={{ fontSize: '0.8rem', color: '#991b1b' }}>
+                            <b>Common error codes:</b>
+                            <br/>• 21608: Unverified number (trial limitation)
+                            <br/>• 21211: Invalid phone format
+                            <br/>• 21614: Not a mobile number
+                          </p>
+                        </div>
+                      </div>
+                    ) : sendResult?.failed > 0 ? (
+                      // Partial failure
+                      <div>
+                        <p style={{ fontWeight: 700, color: '#f59e0b', marginBottom: '12px' }}>
+                          ⚠️ Campaign Partially Delivered
+                        </p>
+                        <p style={{ fontSize: '0.9rem', color: 'var(--muted)' }}>
+                          Total Sent: <b>{sendResult?.total}</b>
+                          <br />
+                          Delivered: <b>{sendResult?.delivered}</b>
+                          <br />
+                          Failed: <b>{sendResult?.failed}</b>
+                        </p>
+                        {sendResult?.results && sendResult.results.length > 0 && (
+                          <div style={{ marginTop: '12px', maxHeight: '200px', overflowY: 'auto' }}>
+                            <p style={{ fontSize: '0.8rem', fontWeight: 700, marginBottom: '8px', color: '#f59e0b' }}>
+                              Failed recipients:
+                            </p>
+                            {sendResult.results
+                              .filter(r => !r.success)
+                              .map((r, i) => (
+                                <div key={i} style={{ fontSize: '0.75rem', color: '#dc2626', padding: '4px 8px', background: '#fef2f2', borderRadius: '4px', marginBottom: '4px' }}>
+                                  <code>{r.phone}</code>: {r.error || 'Unknown error'}{r.code && ` (Code: ${r.code})`}
+                                </div>
+                              ))}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      // All delivered
+                      <div>
+                        <p style={{ fontWeight: 700, color: '#167b58', marginBottom: '12px' }}>
+                          ✅ Campaign Sent Successfully!
+                        </p>
+                        <p style={{ fontSize: '0.9rem', color: 'var(--muted)' }}>
+                          Total Sent: <b>{sendResult?.total}</b>
+                          <br />
+                          Delivered: <b>{sendResult?.delivered}</b>
+                          <br />
+                          Failed: <b>{sendResult?.failed}</b>
+                        </p>
+                      </div>
+                    )}
+
                     {messageType === 'whatsapp' && sendResult?.waLinks && sendResult.waLinks.length > 0 && (
                       <div style={{ marginTop: '16px', padding: '12px', background: 'var(--soft)', borderRadius: '8px', border: '1px solid var(--line)' }}>
                         <p style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '8px' }}>
