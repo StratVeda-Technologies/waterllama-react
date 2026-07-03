@@ -311,7 +311,6 @@ async function callSupabaseFunction(functionName, payload) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
         'apikey': SUPABASE_ANON_KEY,
       },
       // Merge Twilio fallback into payload so edge function can use them if secrets aren't set
@@ -387,7 +386,6 @@ export async function sendBulkSmsViaEdge({ recipients, message, senderName }) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
           'apikey': SUPABASE_ANON_KEY,
         },
         // Merge Twilio fallback into payload so edge function can use them if secrets aren't set
