@@ -1,5 +1,61 @@
 [
   {
+    "id": 38,
+    "message": "Hi Kailash, time to drink water. You have completed 31% of your 2.5 L hydration goal today.",
+    "sent": 1,
+    "delivered": 1,
+    "failed": 0,
+    "timestamp": "2026-07-03T12:14:35.975Z"
+  },
+  {
+    "id": 37,
+    "message": "Hi Kailash, time to drink water. You have completed 31% of your 2.5 L hydration goal today.",
+    "sent": 1,
+    "delivered": 1,
+    "failed": 0,
+    "timestamp": "2026-07-03T12:13:54.225Z"
+  },
+  {
+    "id": 36,
+    "message": "Hi Nikhil, hope you are staying hydrated today! Log your water intake in Aqualama.",
+    "sent": 1,
+    "delivered": 1,
+    "failed": 0,
+    "timestamp": "2026-07-03T12:04:36.008Z"
+  },
+  {
+    "id": 35,
+    "message": "Hi Kailash, time to drink water. You have completed 31% of your 2.5 L hydration goal today.",
+    "sent": 1,
+    "delivered": 1,
+    "failed": 0,
+    "timestamp": "2026-07-03T12:00:44.116Z"
+  },
+  {
+    "id": 34,
+    "message": "Hi User, time to drink water. You have completed 31% of your 2.5 L hydration goal today.",
+    "sent": 1,
+    "delivered": 1,
+    "failed": 0,
+    "timestamp": "2026-07-03T11:44:53.187Z"
+  },
+  {
+    "id": 33,
+    "message": "Hi User, time to drink water. You have completed 31% of your 2.5 L hydration goal today.",
+    "sent": 1,
+    "delivered": 1,
+    "failed": 0,
+    "timestamp": "2026-07-03T11:24:06.520Z"
+  },
+  {
+    "id": 32,
+    "message": "Hi Kailash, time to drink water. You have completed 31% of your 2.5 L hydration goal today.",
+    "sent": 1,
+    "delivered": 1,
+    "failed": 0,
+    "timestamp": "2026-07-03T11:20:24.941Z"
+  },
+  {
     "id": 31,
     "message": "Stay strong {name}! You are close to hitting your daily water target today. Keep tracking!",
     "sent": 1,

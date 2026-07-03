@@ -40,7 +40,10 @@
       "Bash(tar -xf /tmp/artifact/artifact.tar -C /tmp/artifact)",
       "Bash(supabase *)",
       "Bash(npx supabase *)",
-      "Bash(git pull *)"
+      "Bash(git pull *)",
+      "Bash(gh secret *)",
+      "Bash(node -e \"const fs = require\\('fs'\\); const content = fs.readFileSync\\('server.js', 'utf8'\\); const lines = content.split\\('\\\\n'\\); for \\(let i = 668; i < 695; i++\\) { console.log\\(i+1, JSON.stringify\\(lines[i]\\)\\); }\")",
+      "Bash(node -e ' *)"
     ]
   }
 }
