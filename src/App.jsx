@@ -356,12 +356,15 @@ function App() {
     setAutoSendStatus('sending')
     setAutoSendError('')
 
-    // ── WhatsApp: open wa.me link with message pre-filled (no backend needed) ──
     try {
-      const rawPhone = cleanPhone.replace(/^\+/, '')
-      const encodedMsg = encodeURIComponent(reminderMessage)
-      const deeplink = `https://wa.me/${rawPhone}?text=${encodedMsg}`
-      window.open(deeplink, '_blank', 'noopener,noreferrer')
+      // Use sendReminderViaEdge for both WhatsApp and SMS
+      // For WhatsApp: uses wa.me links (client-side, no backend)
+      // For SMS: uses Supabase Edge Functions → Twilio
+      const result = await sendReminderViaEdge({
+        phone: cleanPhone,
+        message: reminderMessage,
+        method: notificationMethod.toLowerCase(), // 'whatsapp' or 'sms'
+      })
 
       const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       setLastReminder(now)
@@ -370,13 +373,18 @@ function App() {
       setTimeout(() => setAutoSendStatus('idle'), 4000)
 
       if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-        new Notification('Aqualama — WhatsApp reminder', {
-          body: `WhatsApp opened with reminder for ${cleanPhone}`,
+        new Notification(`Aqualama — ${notificationMethod} reminder`, {
+          body: `${notificationMethod} reminder sent to ${cleanPhone}`,
         })
       }
+
+      // For WhatsApp via wa.me, open the links
+      if (notificationMethod === 'WhatsApp' && result.waLinks) {
+        result.waLinks.forEach(link => window.open(link, '_blank', 'noopener,noreferrer'))
+      }
     } catch (err) {
-      console.error('sendReminder WhatsApp error:', err)
-      setAutoSendError(err.message ?? 'Could not open WhatsApp')
+      console.error(`sendReminder ${notificationMethod} error:`, err)
+      setAutoSendError(err.message ?? `Could not send ${notificationMethod}`)
       setAutoSendStatus('error')
       setTimeout(() => setAutoSendStatus('idle'), 6000)
     }
@@ -762,7 +770,7 @@ function App() {
               <p>Reminders fire automatically via {notificationMethod}. Enable them, add your number, and the app handles the rest.</p>
 
               <div className="method-toggle">
-                {['WhatsApp'].map((method) => (
+                {['WhatsApp', 'SMS'].map((method) => (
                   <button
                     className={notificationMethod === method ? 'active' : ''}
                     key={method}
@@ -772,8 +780,8 @@ function App() {
                     {method}
                   </button>
                 ))}
-                <span className="method-note" title="WhatsApp works without backend — opens wa.me link">
-                  💡 WhatsApp only (no backend needed)
+                <span className="method-note" title="WhatsApp works client-side via wa.me. SMS requires Supabase Edge Functions + Twilio.">
+                  💡 WhatsApp: free (wa.me) | SMS: requires Supabase + Twilio
                 </span>
               </div>
 
@@ -868,7 +876,8 @@ function App() {
               <h2>Running in local mode</h2>
               <p>All data is stored in your browser's localStorage. No database server required.</p>
               <p>Works offline and on any device - just open the app!</p>
-              <div style={{ marginTop: '16px', padding: '16px', background: 'var(--soft)', borderRadius: '12px', border: '1px solid var(--line)' }}>
+
+              <div style={{ marginTop: '20px', padding: '16px', background: 'var(--soft)', borderRadius: '12px', border: '1px solid var(--line)' }}>
                 <strong>✅ Data persists locally</strong>
                 <ul style={{ margin: '8px 0 0 0', paddingLeft: '20px', fontSize: '0.9rem' }}>
                   <li>Water intake logs</li>
@@ -876,8 +885,42 @@ function App() {
                   <li>Reminders & preferences</li>
                   <li>Premium status</li>
                 </ul>
-                <p style={{ margin: '12px 0 0 0', fontSize: '0.85rem', color: 'var(--muted)' }}>
-                  WhatsApp reminders work via wa.me links (no backend needed). For Bulk SMS: configure Supabase Edge Functions.
+              </div>
+
+              <div style={{ marginTop: '16px', padding: '16px', background: 'var(--soft)', borderRadius: '12px', border: '1px solid var(--line)' }}>
+                <strong>📱 Reminder Channels</strong>
+                <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: 'var(--bg)', borderRadius: '8px', border: '1px solid var(--line)' }}>
+                    <span style={{ fontSize: '1.5rem' }}>📱</span>
+                    <div>
+                      <strong>WhatsApp (wa.me)</strong>
+                      <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: 'var(--muted)' }}>
+                        ✅ Works automatically — opens WhatsApp chat via wa.me links
+                        <br />No backend configuration needed
+                      </p>
+                    </div>
+                    <span className="sms-tag active" style={{ fontSize: '0.7rem', padding: '4px 8px' }}>Ready</span>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: 'var(--bg)', borderRadius: '8px', border: '1px solid var(--line)' }}>
+                    <span style={{ fontSize: '1.5rem' }}>📲</span>
+                    <div>
+                      <strong>SMS (Twilio via Supabase)</strong>
+                      <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: 'var(--muted)' }}>
+                        {isSupabaseConfigured()
+                          ? '✅ Configured — SMS reminders will be sent via Supabase Edge Functions'
+                          : '⚠ Not configured — Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to .env.local'}
+                      </p>
+                    </div>
+                    <span className={`sms-tag ${isSupabaseConfigured() ? 'active' : 'vip'}`} style={{ fontSize: '0.7rem', padding: '4px 8px' }}>
+                      {isSupabaseConfigured() ? 'Ready' : 'Setup Required'}
+                    </span>
+                  </div>
+                </div>
+                <p style={{ margin: '12px 0 0 0', fontSize: '0.8rem', color: 'var(--muted)' }}>
+                  <strong>Note:</strong> SMS reminders require a Twilio account with verified numbers (trial limitation).
+                  For auto-reminders, SMS users will receive messages automatically every {reminderGap} hours.
+                  WhatsApp auto-reminders open wa.me links (requires app to be open).
                 </p>
               </div>
             </section>
