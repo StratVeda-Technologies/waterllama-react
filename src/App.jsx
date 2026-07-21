@@ -567,7 +567,7 @@ function App() {
             <p className="sync-status">{syncStatus}</p>
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
-            <button onClick={() => window.location.href = '/sms-dashboard.html'} className="avatar-button" style={{ fontSize: '16px', background: 'var(--brand-strong)' }} title="Bulk SMS Dashboard">
+            <button onClick={() => window.location.href = `${import.meta.env.BASE_URL}sms-dashboard.html`} className="avatar-button" style={{ fontSize: '16px', background: 'var(--brand-strong)' }} title="Bulk SMS Dashboard">
               💬
             </button>
             <button className="avatar-button" type="button" title="Profile" onClick={() => setActiveTab('premium')}>
