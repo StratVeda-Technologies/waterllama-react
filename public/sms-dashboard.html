@@ -213,8 +213,9 @@ textarea{resize:vertical;min-height:120px;font-family:'DM Mono',monospace;font-s
           </select>
         </div>
         <div class="form-group">
-          <label>Or enter numbers manually (comma-separated)</label>
-          <input type="text" id="manualNumbers" placeholder="+91 9876543210, +91 9123456789, …" oninput="updateManualCount()">
+          <label>Or enter numbers manually (comma-separated, 10-digit only)</label>
+          <input type="text" id="manualNumbers" placeholder="9876543210, 9123456789, …" oninput="updateManualCount()">
+          <p style="font-size:11px;color:var(--text3);margin-top:4px">Enter 10-digit Indian mobile numbers only (auto-prefixed with +91)</p>
         </div>
         <div class="flex items-center justify-between mt-2">
           <div class="text-sm" id="recipientInfo">No recipients selected</div>
@@ -575,7 +576,7 @@ function getRecipients() {
     <div class="modal-title">Add Contact</div>
     <div class="modal-sub">Add a new contact to your list</div>
     <div class="form-group"><label>Full Name</label><input type="text" id="newName" placeholder="e.g. Priya Sharma"></div>
-    <div class="form-group"><label>Phone Number</label><input type="tel" id="newPhone" placeholder="+91 9876543210"></div>
+    <div class="form-group"><label>Phone Number</label><div style="display:flex;align-items:center;gap:8px"><span style="padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);font-weight:600;color:var(--text);font-size:0.95rem">+91</span><input type="tel" id="newPhone" placeholder="9876543210" style="flex:1" maxlength="10" oninput="this.value=this.value.replace(/\D/g,'').slice(0,10)"></div><p style="font-size:11px;color:var(--text3);margin-top:4px">Enter 10-digit Indian mobile number (auto-prefixed with +91)</p></div>
     <div class="form-group"><label>Group</label><select id="newGroup"><option>Customers</option><option>Leads</option><option>VIP</option></select></div>
     <div class="flex gap-2 justify-between mt-3">
       <button class="btn btn-outline" onclick="closeModal('addContactModal')">Cancel</button>
@@ -779,7 +780,7 @@ async function startSending(){
 
     const response =
       await fetch(
-        'http://localhost:5000/send-bulk-sms',
+        'https://waterllama-sms-backend.onrender.com/send-bulk-sms',
         {
           method:'POST',
           headers:{
