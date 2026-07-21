@@ -33,6 +33,12 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          # MSG91 — for SMS (Reminder + Bulk SMS from any device)
+          VITE_MSG91_AUTH_KEY: ${{ secrets.MSG91_AUTH_KEY }}
+          VITE_MSG91_SENDER_ID: ${{ secrets.MSG91_SENDER_ID }}
+          VITE_MSG91_TEMPLATE_ID: ${{ secrets.MSG91_TEMPLATE_ID || '6a4cd3daab456645950e0bb2' }}
+          VITE_MSG91_PE_ID: ${{ secrets.MSG91_PE_ID || '895645' }}
+          # Twilio — kept for WhatsApp only
           VITE_TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
           VITE_TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
           VITE_TWILIO_PHONE_NUMBER: ${{ secrets.TWILIO_PHONE_NUMBER }}
@@ -52,7 +58,6 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
         with:
-          # Retry on transient failures (GitHub Pages "try again later" error)
           retries: 3
           retry_wait: 30
 
@@ -80,6 +85,10 @@ jobs:
       - name: Set Edge Function Secrets
         run: |
           supabase secrets set \
+            MSG91_AUTH_KEY="${{ secrets.MSG91_AUTH_KEY }}" \
+            MSG91_SENDER_ID="${{ secrets.MSG91_SENDER_ID }}" \
+            MSG91_TEMPLATE_ID="${{ secrets.MSG91_TEMPLATE_ID || '6a4cd3daab456645950e0bb2' }}" \
+            MSG91_PE_ID="${{ secrets.MSG91_PE_ID || '895645' }}" \
             TWILIO_ACCOUNT_SID="${{ secrets.TWILIO_ACCOUNT_SID }}" \
             TWILIO_AUTH_TOKEN="${{ secrets.TWILIO_AUTH_TOKEN }}" \
             TWILIO_PHONE_NUMBER="${{ secrets.TWILIO_PHONE_NUMBER }}" \

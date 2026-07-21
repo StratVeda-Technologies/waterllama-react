@@ -2,7 +2,7 @@
  * mysqlClient.js - Local-first data layer for Waterllama
  * - All data persists in localStorage (works offline, any device)
  * - WhatsApp reminders → wa.me link (works client-side)
- * - SMS/WhatsApp via Supabase Edge Functions (when configured)
+ * - SMS via MSG91 API (through Supabase Edge Functions)
  * - Auto reminders → Client-side interval when app is open
  */
 
@@ -14,16 +14,65 @@ export const dbReady = false;
 let SUPABASE_URL = import.meta.env?.VITE_SUPABASE_URL || localStorage.getItem('supabase_url') || '';
 let SUPABASE_ANON_KEY = import.meta.env?.VITE_SUPABASE_ANON_KEY || import.meta.env?.VITE_SUPABASE_PUBLISHABLE_KEY || localStorage.getItem('supabase_anon_key') || localStorage.getItem('supabase_publishable_key') || '';
 
-// Twilio credentials baked into build from VITE_TWILIO_* env vars.
-// Passed to edge functions as fallback when Supabase secrets are not configured.
+// MSG91 credentials for SMS — baked into build from VITE_MSG91_* env vars.
+// Passed to edge functions so SMS works from any device without Supabase secrets.
+const MSG91_AUTH_KEY  = import.meta.env?.VITE_MSG91_AUTH_KEY   || '548199AF2QjGjmXu6a4ca37eP1';
+let MSG91_SENDER_ID = import.meta.env?.VITE_MSG91_SENDER_ID  || localStorage.getItem('msg91_sender_id') || '8956455702';
+// DLT Template ID — required by TRAI for SMS delivery in India.
+// Without a valid template_id, telecom operators block delivery even if MSG91 returns success.
+let MSG91_TEMPLATE_ID = import.meta.env?.VITE_MSG91_TEMPLATE_ID || localStorage.getItem('msg91_template_id') || '6a4cd3daab456645950e0bb2';
+// DLT Entity ID (Principal Entity / PE ID) — required by TRAI.
+let MSG91_PE_ID = import.meta.env?.VITE_MSG91_PE_ID || localStorage.getItem('msg91_pe_id') || '895645';
+
+// Twilio credentials — used ONLY for WhatsApp (not SMS)
 const TWILIO_SID   = import.meta.env?.VITE_TWILIO_ACCOUNT_SID  || '';
 const TWILIO_TOKEN = import.meta.env?.VITE_TWILIO_AUTH_TOKEN    || '';
 const TWILIO_FROM  = import.meta.env?.VITE_TWILIO_PHONE_NUMBER  || '';
 
-// Helper: returns Twilio fallback payload fields (only if we have values)
+function msg91Fallback() {
+  if (!MSG91_AUTH_KEY) return {};
+  return {
+    _msg91AuthKey: MSG91_AUTH_KEY,
+    _msg91SenderId: MSG91_SENDER_ID,
+    ...(MSG91_TEMPLATE_ID ? { _msg91TemplateId: MSG91_TEMPLATE_ID } : {}),
+    ...(MSG91_PE_ID ? { _msg91PeId: MSG91_PE_ID } : {}),
+  };
+}
+
+// Helper: returns Twilio payload fields for WhatsApp edge functions only
 function twilioFallback() {
   if (!TWILIO_SID || !TWILIO_TOKEN) return {};
   return { _twilioSid: TWILIO_SID, _twilioToken: TWILIO_TOKEN, _twilioFrom: TWILIO_FROM };
+}
+
+export function setMsg91TemplateId(id) {
+  MSG91_TEMPLATE_ID = id || '';
+  if (id) localStorage.setItem('msg91_template_id', id);
+  else localStorage.removeItem('msg91_template_id');
+}
+
+export function getMsg91TemplateId() {
+  return MSG91_TEMPLATE_ID;
+}
+
+export function setMsg91SenderId(id) {
+  MSG91_SENDER_ID = id || '';
+  if (id) localStorage.setItem('msg91_sender_id', id);
+  else localStorage.removeItem('msg91_sender_id');
+}
+
+export function getMsg91SenderId() {
+  return MSG91_SENDER_ID;
+}
+
+export function setMsg91PeId(id) {
+  MSG91_PE_ID = id || '';
+  if (id) localStorage.setItem('msg91_pe_id', id);
+  else localStorage.removeItem('msg91_pe_id');
+}
+
+export function getMsg91PeId() {
+  return MSG91_PE_ID;
 }
 
 export function setSupabaseConfig(url, key) {
@@ -289,6 +338,9 @@ export async function sendReminderViaEdge({ to, method, message, userId }) {
       return { ok: true, sid: singleResult?.sid || null };
     } catch (err) {
       if (err.message.startsWith('SMS failed:')) throw err;
+      if (supabaseError) {
+        throw new Error(`SMS failed: ${supabaseError} (Local backend was also unreachable: ${err.message})`);
+      }
       throw new Error(`SMS failed: ${err.message}. Make sure the local backend server (port 5000) is running.`);
     }
   } catch (err) {
@@ -313,8 +365,8 @@ async function callSupabaseFunction(functionName, payload) {
         'Content-Type': 'application/json',
         'apikey': SUPABASE_ANON_KEY,
       },
-      // Merge Twilio fallback into payload so edge function can use them if secrets aren't set
-      body: JSON.stringify({ ...payload, ...twilioFallback() }),
+      // Merge MSG91 credentials into payload for SMS; Twilio creds for WhatsApp
+      body: JSON.stringify({ ...payload, ...msg91Fallback(), ...twilioFallback() }),
     });
 
     const data = await response.json();
@@ -324,7 +376,7 @@ async function callSupabaseFunction(functionName, payload) {
       return { ok: false, error: data.error || `HTTP ${response.status}: ${response.statusText}` };
     }
 
-    // Return the full response body so Twilio errors are not swallowed.
+    // Return the full response body so MSG91 errors are not swallowed.
     // Edge functions always return 200 with { ok: true/false } — check that field.
     if (data.ok === false) {
       return { ok: false, error: data.error || 'SMS send failed', ...data };
@@ -370,10 +422,9 @@ export async function syncWaterEntriesToDB({ userId, logs, drinkFactors }) {
 }
 
 /**
- * Send bulk SMS — via Supabase Edge Function (send-bulk-sms) → Twilio.
- * Returns { ok, results } where each result has: { phone, success, delivered, sid, status, error, note, trialWarning }
- * 'success' means Twilio accepted the message for delivery (queued/sent).
- * 'delivered' is true ONLY when Twilio confirms handset delivery (async, rarely immediate).
+ * Send bulk SMS — via Supabase Edge Function (send-bulk-sms) → MSG91.
+ * Returns { ok, results } where each result has: { phone, success, delivered, status, error, note }
+ * 'success' means MSG91 accepted the message for delivery.
  */
 export async function sendBulkSmsViaEdge({ recipients, message, senderName }) {
   // Normalize all recipient phone numbers to E.164 format
@@ -388,8 +439,8 @@ export async function sendBulkSmsViaEdge({ recipients, message, senderName }) {
           'Content-Type': 'application/json',
           'apikey': SUPABASE_ANON_KEY,
         },
-        // Merge Twilio fallback into payload so edge function can use them if secrets aren't set
-        body: JSON.stringify({ recipients: normalizedRecipients, message, senderName, ...twilioFallback() }),
+        // Merge MSG91 credentials into payload for SMS delivery
+        body: JSON.stringify({ recipients: normalizedRecipients, message, senderName, ...msg91Fallback() }),
       });
 
       const data = await response.json();
@@ -399,7 +450,7 @@ export async function sendBulkSmsViaEdge({ recipients, message, senderName }) {
         const results = data.results || [];
         const allFailed = results.length > 0 && results.every(r => !r.success);
         const topError = allFailed
-          ? (results[0]?.error || 'All messages failed. Check Twilio credentials and recipient numbers.')
+          ? (results[0]?.error || 'All messages failed. Check MSG91 credentials and recipient numbers.')
           : undefined;
 
         return { ok: !allFailed, results, error: topError };
@@ -447,6 +498,12 @@ export async function sendBulkSmsViaEdge({ recipients, message, senderName }) {
 
     return { ok: !allFailed, results, error: topError };
   } catch (err) {
+    if (supabaseError) {
+      return {
+        ok: false,
+        error: `SMS service failed: ${supabaseError} (Local backend was also unreachable: ${err.message})`
+      };
+    }
     return {
       ok: false,
       error: `Local backend connection failed: ${err.message}. Make sure the local backend server (port 5000) is running and configured.`

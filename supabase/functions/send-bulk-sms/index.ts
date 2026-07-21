@@ -6,10 +6,10 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 // @ts-ignore - Deno global exists at runtime in Supabase Edge Functions
 declare const Deno: { env: { get: (key: string) => string | undefined } };
 
-// Priority for Twilio credentials:
-//   1. Fallback credentials passed in request body (_twilioSid, _twilioToken, _twilioFrom)
-//      - these come from VITE_TWILIO_* env vars baked into the frontend build
-//   2. Supabase secrets (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER)
+// SMS provider: MSG91
+// Priority for MSG91 credentials:
+//   1. Passed in request body (_msg91AuthKey, _msg91SenderId, _msg91TemplateId)
+//   2. Supabase secrets (MSG91_AUTH_KEY, MSG91_SENDER_ID, MSG91_TEMPLATE_ID)
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -23,7 +23,11 @@ serve(async (req: Request) => {
   }
 
   try {
-    const { recipients, message, senderName, campaignId, _twilioSid, _twilioToken, _twilioFrom } = await req.json();
+    const {
+      recipients, message, senderName, campaignId,
+      // MSG91 credentials
+      _msg91AuthKey, _msg91SenderId, _msg91TemplateId, _msg91PeId,
+    } = await req.json();
 
     if (!Array.isArray(recipients) || recipients.length === 0 || !message) {
       return new Response(
@@ -32,22 +36,15 @@ serve(async (req: Request) => {
       );
     }
 
-    // Prioritize credentials sent by frontend (_twilioSid) over Supabase environment secrets
-    const accountSid = _twilioSid || Deno.env.get("TWILIO_ACCOUNT_SID");
-    const authToken  = _twilioToken || Deno.env.get("TWILIO_AUTH_TOKEN");
-    const fromNumber = _twilioFrom || Deno.env.get("TWILIO_PHONE_NUMBER");
-    const serviceSid = Deno.env.get("TWILIO_MESSAGING_SERVICE_SID");
+    // Resolve MSG91 credentials
+    const authKey    = _msg91AuthKey    || Deno.env.get("MSG91_AUTH_KEY");
+    const senderId   = _msg91SenderId   || Deno.env.get("MSG91_SENDER_ID") || "8956455702";
+    const templateId = _msg91TemplateId || Deno.env.get("MSG91_TEMPLATE_ID");
+    const peId       = _msg91PeId       || Deno.env.get("MSG91_PE_ID");
 
-    if (!accountSid || !authToken) {
+    if (!authKey) {
       return new Response(
-        JSON.stringify({ error: "Twilio credentials not configured. Please set TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN." }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    if (!fromNumber && !serviceSid) {
-      return new Response(
-        JSON.stringify({ error: "No sender configured: set TWILIO_PHONE_NUMBER or TWILIO_MESSAGING_SERVICE_SID" }),
+        JSON.stringify({ error: "MSG91 credentials not configured. Set MSG91_AUTH_KEY in Supabase secrets." }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -83,9 +80,6 @@ serve(async (req: Request) => {
     }
 
     const results: any[] = [];
-    const url = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
-    const authHeader = "Basic " + btoa(`${accountSid}:${authToken}`);
-    const isLikelyTrialAccount = accountSid && accountSid.startsWith("AC");
 
     for (const recipient of recipients) {
       const phone = typeof recipient === "string" ? recipient : recipient.phone;
@@ -95,72 +89,58 @@ serve(async (req: Request) => {
 
       try {
         const normalizedPhone = normalizePhoneNumber(phone);
+        // MSG91 expects number without leading + (e.g. 919876543210)
+        const mobile = normalizedPhone.replace(/^\+/, '');
 
-        const body = new URLSearchParams();
-        body.append("To", normalizedPhone);
-        body.append("Body", personalizedMessage);
-        if (serviceSid) {
-          body.append("MessagingServiceSid", serviceSid);
-        } else {
-          body.append("From", fromNumber!);
+        const msg91Payload: any = {
+          sender: senderId,
+          route: "4",      // 4 = transactional
+          country: "91",
+          sms: [{ message: personalizedMessage, to: [mobile] }],
+        };
+        if (templateId) {
+          msg91Payload.DLT_TE_ID = templateId;
+        }
+        if (peId) {
+          msg91Payload.PE_ID = peId;
         }
 
-        const response = await fetch(url, {
+        const response = await fetch("https://api.msg91.com/api/v2/sendsms", {
           method: "POST",
           headers: {
-            "Authorization": authHeader,
-            "Content-Type": "application/x-www-form-urlencoded",
+            "authkey": authKey,
+            "content-type": "application/json",
           },
-          body: body.toString(),
+          body: JSON.stringify(msg91Payload),
         });
 
         const data = await response.json();
+        console.log(`MSG91 response for ${mobile}:`, data);
 
-        if (response.ok) {
-          const twilioStatus = data.status;
-          const isActuallyDelivered = twilioStatus === "delivered" || twilioStatus === "sent";
-          const isFailedOrUndelivered = twilioStatus === "failed" || twilioStatus === "undelivered";
-          const isAccepted = twilioStatus === "queued";
-
+        if (data.type === "success" || data.type === "Success") {
           results.push({
             phone: normalizedPhone,
             originalPhone: phone,
-            success: !isFailedOrUndelivered,
-            delivered: isActuallyDelivered,
-            sid: data.sid,
-            status: twilioStatus,
-            note: isAccepted
-              ? "Message accepted by Twilio for delivery."
-              : isActuallyDelivered
-                ? "Message delivered to recipient's phone."
-                : "Message failed or was undelivered.",
-            trialWarning: isLikelyTrialAccount && !serviceSid
-              ? "Trial account: can only send to verified numbers. Add numbers in Twilio Console → Verified Caller IDs."
-              : undefined,
+            success: true,
+            delivered: false, // MSG91 doesn't confirm delivery immediately
+            status: "sent",
+            note: "Message accepted by MSG91 for delivery.",
           });
         } else {
-          const errorCode = data.code;
-          const errorMessage = data.message || "Twilio API error";
-          let friendlyError = errorMessage;
-          let isTrialError = false;
-          let isUnverifiedNumber = false;
+          const errorMsg = data.message || data.error || "MSG91 API error";
+          let friendlyError = errorMsg;
 
-          if (errorCode === 21211) friendlyError = "Invalid phone number format. Use E.164 format (e.g., +919876543210).";
-          else if (errorCode === 21614) friendlyError = "Phone number is not a mobile number or is unreachable.";
-          else if (errorCode === 21608) {
-            friendlyError = "Cannot send to unverified number (Twilio trial account). Verify in Twilio Console → Verified Caller IDs.";
-            isTrialError = true;
-            isUnverifiedNumber = true;
-          }
-          else if (errorCode === 20429) friendlyError = "Rate limit exceeded. Please wait before sending more messages.";
-          else if (errorCode === 20003 || errorCode === 401) friendlyError = "Twilio authentication failed. Check your Account SID and Auth Token.";
-          else if (errorMessage.toLowerCase().includes("trial")) {
-            friendlyError = "Twilio trial account limitation. Verify recipient numbers in Twilio Console → Verified Caller IDs.";
-            isTrialError = true;
-          } else if (errorMessage.toLowerCase().includes("unverified")) {
-            friendlyError = "Recipient number not verified for trial account. Verify in Twilio Console → Verified Caller IDs.";
-            isTrialError = true;
-            isUnverifiedNumber = true;
+          // MSG91 error codes
+          if (errorMsg.toLowerCase().includes("invalid mobile")) {
+            friendlyError = "Invalid mobile number format. Use Indian format (e.g. 919876543210).";
+          } else if (errorMsg.toLowerCase().includes("authkey")) {
+            friendlyError = "Invalid MSG91 Auth Key. Check your credentials.";
+          } else if (errorMsg.toLowerCase().includes("sender")) {
+            friendlyError = "Invalid or unapproved Sender ID for MSG91.";
+          } else if (errorMsg.toLowerCase().includes("balance") || errorMsg.toLowerCase().includes("credit")) {
+            friendlyError = "Insufficient MSG91 credits. Recharge your account.";
+          } else if (errorMsg.toLowerCase().includes("dnd")) {
+            friendlyError = "Number is on DND (Do Not Disturb) list. Cannot deliver.";
           }
 
           results.push({
@@ -168,9 +148,6 @@ serve(async (req: Request) => {
             originalPhone: phone,
             success: false,
             error: friendlyError,
-            code: errorCode,
-            isTrialError,
-            isUnverifiedNumber,
           });
         }
       } catch (err: unknown) {
@@ -188,7 +165,7 @@ serve(async (req: Request) => {
         campaign_id: campaignIdToUse,
         phone: r.phone,
         success: r.success,
-        provider_sid: r.sid || null,
+        provider_sid: r.status || null,
         error_message: r.error || null,
       })));
     }

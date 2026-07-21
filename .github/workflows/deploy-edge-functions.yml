@@ -1,0 +1,39 @@
+name: Deploy Edge Functions Only
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy-edge-functions:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Link Supabase project
+        run: supabase link --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+      - name: Deploy Edge Functions
+        run: |
+          supabase functions deploy send-bulk-sms --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} --no-verify-jwt
+          supabase functions deploy send-reminder --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} --no-verify-jwt
+          supabase functions deploy send-sms --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} --no-verify-jwt
+          supabase functions deploy send-whatsapp --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} --no-verify-jwt
+          supabase functions deploy log-reminder --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} --no-verify-jwt
+      - name: Set Edge Function Secrets (MSG91 + Twilio for WhatsApp)
+        run: |
+          supabase secrets set \
+            MSG91_AUTH_KEY="${{ secrets.MSG91_AUTH_KEY }}" \
+            MSG91_SENDER_ID="${{ secrets.MSG91_SENDER_ID }}" \
+            MSG91_TEMPLATE_ID="${{ secrets.MSG91_TEMPLATE_ID || '6a4cd3daab456645950e0bb2' }}" \
+            MSG91_PE_ID="${{ secrets.MSG91_PE_ID || '895645' }}" \
+            TWILIO_ACCOUNT_SID="${{ secrets.TWILIO_ACCOUNT_SID }}" \
+            TWILIO_AUTH_TOKEN="${{ secrets.TWILIO_AUTH_TOKEN }}" \
+            TWILIO_PHONE_NUMBER="${{ secrets.TWILIO_PHONE_NUMBER }}" \
+            TWILIO_FROM_SMS="${{ secrets.TWILIO_PHONE_NUMBER }}" \
+            SERVICE_ROLE_KEY="${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}

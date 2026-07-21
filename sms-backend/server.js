@@ -35,6 +35,52 @@ function createTwilioClient() {
 
 const twilioClient = createTwilioClient();
 
+// ── MSG91 CONFIG ──────────────────────────────────────────────────
+const msg91AuthKey   = process.env.MSG91_AUTH_KEY    || '548199AF2QjGjmXu6a4ca37eP1';
+const msg91SenderId  = process.env.MSG91_SENDER_ID   || '8956455702';
+const msg91TemplateId = process.env.MSG91_TEMPLATE_ID || '';
+// DLT Principal Entity ID (PE ID) — registered with TRAI. Required alongside DLT_TE_ID.
+const msg91PeId      = process.env.MSG91_PE_ID       || '895645';
+
+async function sendMsg91Sms(to, message, templateId, peId) {
+  let mobile = to.replace(/[^\d]/g, '');
+  // Indian 10-digit format fallback
+  if (mobile.length === 10 && /^[6-9]/.test(mobile)) {
+    mobile = '91' + mobile;
+  }
+
+  const payload = {
+    sender: msg91SenderId,
+    route: '4', // Transactional
+    country: '91',
+    sms: [{ message, to: [mobile] }]
+  };
+
+  // DLT_TE_ID = DLT Template ID (exact MSG91 v2 API field name)
+  const tid = templateId || msg91TemplateId;
+  if (tid) payload.DLT_TE_ID = tid;
+
+  // PE_ID = Principal Entity ID (exact MSG91 v2 API field name)
+  const pid = peId || msg91PeId;
+  if (pid) payload.PE_ID = pid;
+
+  console.log(`📤 MSG91 payload for ${mobile}:`, JSON.stringify(payload));
+
+  const response = await fetch('https://api.msg91.com/api/v2/sendsms', {
+    method: 'POST',
+    headers: {
+      'authkey': msg91AuthKey,
+      'content-type': 'application/json',
+      'accept': 'application/json'
+    },
+    body: JSON.stringify(payload)
+  });
+
+  const data = await response.json();
+  console.log(`MSG91 response for ${mobile}:`, JSON.stringify(data));
+  return data;
+}
+
 // ── MYSQL POOL ────────────────────────────────────────────────────
 let wlPool = null;
 let smsPool = null;
@@ -423,99 +469,69 @@ app.get('/send-history', async (req, res) => {
 });
 
 app.post('/send-bulk-sms', async (req, res) => {
-  const { recipients, message, senderName } = req.body;
+  const { recipients, message, senderName, _msg91TemplateId, _msg91PeId } = req.body;
   if (!Array.isArray(recipients) || recipients.length === 0 || !message) {
     return res.status(400).json({ error: 'Request body must include recipients array and message.' });
   }
-  if (!twilioClient) return res.status(503).json({ error: 'Twilio not configured' });
-  if (!messagingServiceSid && !fromNumber) {
-    return res.status(500).json({ error: 'Set TWILIO_PHONE_NUMBER or TWILIO_MESSAGING_SERVICE_SID in backend .env' });
-  }
-  const invalidRecipients = recipients.filter(p => !isPhoneNumber(p));
-  if (invalidRecipients.length > 0) {
-    return res.status(400).json({ error: 'All recipients must be E.164 phone numbers.', invalidRecipients });
-  }
+  if (!msg91AuthKey) return res.status(503).json({ error: 'MSG91 not configured' });
+
+  const templateId = _msg91TemplateId || msg91TemplateId;
+  const peId       = _msg91PeId       || msg91PeId;
 
   const results = [];
   for (const phone of recipients) {
     try {
-      const sms = await twilioClient.messages.create(buildMessageOptions(phone, message));
-      
-      // Wait a short moment (1000ms) for Twilio to update delivery status
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      const updatedSms = await twilioClient.messages(sms.sid).fetch();
-
-      // Status can be: "queued", "sent", "failed", "delivered", "undelivered"
-      const twilioStatus = updatedSms.status;
-      const isActuallyDelivered = twilioStatus === "delivered" || twilioStatus === "sent";
-      const isFailedOrUndelivered = twilioStatus === "failed" || twilioStatus === "undelivered";
-      const isAccepted = twilioStatus === "queued" || twilioStatus === "sent";
-
-      results.push({
-        phone,
-        success: !isFailedOrUndelivered, // true for queued/sent/delivered
-        delivered: isActuallyDelivered, // ONLY true if status === "delivered"
-        sid: sms.sid,
-        status: twilioStatus,
-        // IMPORTANT: Twilio "success" means ACCEPTED for delivery, NOT delivered to handset
-        // For trial accounts: messages to unverified numbers are "accepted" but NEVER delivered
-        note: isAccepted
-          ? "Message accepted by Twilio for delivery. Actual delivery to phone is asynchronous and may fail (especially on trial accounts with unverified numbers)."
-          : isActuallyDelivered
-            ? "Message delivered to recipient's phone."
-            : "Message failed or was undelivered.",
-        // Trial account warning - CRITICAL for users not receiving SMS
-        trialWarning: accountSid && accountSid.startsWith("AC") && !messagingServiceSid
-          ? "⚠️ TWILIO TRIAL ACCOUNT LIMITATION: You can ONLY send SMS to VERIFIED numbers. Add recipient in Twilio Console → Phone Numbers → Verified Caller IDs, or upgrade your Twilio account. Messages to unverified numbers are 'accepted' but NEVER delivered."
-          : undefined,
-        // Provide guidance for checking actual delivery
-        checkDelivery: isAccepted
-          ? "Check actual delivery status in Twilio Console → Messaging → Logs, or set up a Status Callback URL to receive delivery receipts."
-          : undefined
-      });
-    } catch (err) {
-      // Parse Twilio error codes into friendly messages
-      const code = err.code || err.status;
-      let friendlyError = err.message;
-
-      // Return actual Twilio error - do NOT simulate success
-      // Simulation was causing "successfully sent" UI but SMS never delivered
-      if (code === 21211) {
-        friendlyError = 'Invalid recipient phone number format.';
-      } else if (code === 21614) {
-        friendlyError = 'Phone number is not a mobile number or is unreachable.';
-      } else if (code === 21608) {
-        friendlyError = 'Cannot send to unverified number (Twilio trial account limitation). Verify the number in Twilio console or upgrade account.';
-      } else if (code === 20429) {
-        friendlyError = 'Rate limit exceeded. Please wait before sending more messages.';
-      } else if (code === 20003 || code === 401) {
-        friendlyError = 'Twilio authentication failed. Check your Account SID and Auth Token.';
-      } else if (err.message && (err.message.toLowerCase().includes('trial') || err.message.toLowerCase().includes('unverified'))) {
-        friendlyError = 'Twilio trial account limitation. Upgrade your Twilio account or verify recipient numbers in Twilio console.';
+      const data = await sendMsg91Sms(phone, message, templateId, peId);
+      if (data.type === 'success' || data.type === 'Success') {
+        results.push({
+          phone,
+          success: true,
+          delivered: false,
+          sid: data.message,
+          status: 'sent',
+          note: 'Message accepted by MSG91 for delivery.'
+        });
+      } else {
+        const errorMsg = data.message || data.error || 'MSG91 API error';
+        results.push({
+          phone,
+          success: false,
+          error: errorMsg,
+          code: data.type || 'error'
+        });
       }
-
-      results.push({ phone, success: false, error: friendlyError, code });
+    } catch (err) {
+      results.push({ phone, success: false, error: err.message });
     }
   }
 
   // Save to MySQL
   const delivered = results.filter(r => r.success).length;
   const failed = results.filter(r => !r.success).length;
-  const [campaignResult] = await smsPool.execute(
-    'INSERT INTO campaigns (name, sender_name, message, total_recipients, total_sent, total_delivered, total_failed) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    [senderName || 'Campaign', senderName || 'Aqualama', message, results.length, results.length, delivered, failed]
-  );
-  const campaignId = campaignResult.insertId;
-  for (const r of results) {
-    await smsPool.execute(
-      'INSERT INTO campaign_results (campaign_id, phone, success, provider_sid, error_message) VALUES (?, ?, ?, ?, ?)',
-      [campaignId, r.phone, r.success ? 1 : 0, r.sid || null, r.error || null]
+  let campaignId = null;
+  try {
+    const [campaignResult] = await smsPool.execute(
+      'INSERT INTO campaigns (name, sender_name, message, total_recipients, total_sent, total_delivered, total_failed) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [senderName || 'Campaign', senderName || 'Aqualama', message, results.length, results.length, delivered, failed]
     );
+    campaignId = campaignResult.insertId;
+    for (const r of results) {
+      await smsPool.execute(
+        'INSERT INTO campaign_results (campaign_id, phone, success, provider_sid, error_message) VALUES (?, ?, ?, ?, ?)',
+        [campaignId, r.phone, r.success ? 1 : 0, r.sid || null, r.error || null]
+      );
+    }
+  } catch (dbErr) {
+    console.error('MySQL logging failed:', dbErr.message);
   }
 
   // Also save to local JSON as backup
-  const history = await readJsonFile(sendHistoryFile, []);
-  await writeJsonFile(sendHistoryFile, [{ id: campaignId, message, sent: results.length, delivered, failed, timestamp: new Date().toISOString() }, ...history].slice(0, 100));
+  try {
+    const history = await readJsonFile(sendHistoryFile, []);
+    await writeJsonFile(sendHistoryFile, [{ id: campaignId || Date.now(), message, sent: results.length, delivered, failed, timestamp: new Date().toISOString() }, ...history].slice(0, 100));
+  } catch (jsonErr) {
+    console.error('JSON logging failed:', jsonErr.message);
+  }
 
   res.json(results);
 });
@@ -674,54 +690,37 @@ async function checkAndSendReminders() {
       const progress = Math.min(100, Math.round((totalIntake / dailyGoal) * 100));
       const message = `Hi ${user.name}, time to drink water! You have completed ${progress}% of your ${(dailyGoal / 1000).toFixed(1)}L hydration goal today. Keep it up! 💧`;
 
-      if (!twilioClient) {
-        console.warn('⚠️ Twilio not configured — skipping auto SMS reminder.');
+      if (!msg91AuthKey) {
+        console.warn('⚠️ MSG91 not configured — skipping auto SMS reminder.');
         continue;
       }
 
       console.log(`⏰ Sending automatic SMS reminder to ${user.name} (${user.phone})`);
 
       try {
-        // SMS only — via Twilio
-        const msg = await twilioClient.messages.create(buildMessageOptions(user.phone, message));
-        const sid = msg.sid;
-        // Clear cooldown on success
-        smsCooldown.delete(user.id);
+        // SMS only — via MSG91 (DLT compliant: template ID + entity ID)
+        const data = await sendMsg91Sms(user.phone, message, msg91TemplateId, msg91PeId);
+        if (data.type === 'success' || data.type === 'Success') {
+          // Clear cooldown on success
+          smsCooldown.delete(user.id);
 
-        await wlPool.execute(
-          "INSERT INTO reminder_logs (id, user_id, method, phone, message, status, provider_sid) VALUES (?, ?, ?, ?, ?, ?, ?)",
-          [require('crypto').randomUUID(), user.id, 'SMS', user.phone, message, 'sent', sid]
-        );
-        console.log(`✅ Auto SMS reminder sent to ${user.phone} (SID: ${sid})`);
-      } catch (err) {
-        // Parse Twilio error code for a friendly message
-        const code = err.code || err.status;
-        let friendlyError = err.message;
-
-        // Return actual Twilio error - do NOT simulate success
-        // Simulation was causing "successfully sent" UI but SMS never delivered
-        if (code === 21211) {
-          friendlyError = 'Invalid phone number format.';
-        } else if (code === 21614) {
-          friendlyError = 'Phone number is not a mobile number or is unreachable.';
-        } else if (code === 21608) {
-          friendlyError = 'Cannot send to unverified number (Twilio trial account limitation). Verify the number in Twilio console or upgrade account.';
-        } else if (code === 20429) {
-          friendlyError = 'Rate limit exceeded. Please wait before sending more messages.';
-        } else if (code === 20003 || code === 401) {
-          friendlyError = 'Twilio authentication failed. Check your Account SID and Auth Token.';
-        } else if (err.message && (err.message.toLowerCase().includes('trial') || err.message.toLowerCase().includes('unverified'))) {
-          friendlyError = 'Twilio trial account limitation. Upgrade your Twilio account or verify recipient numbers in Twilio console.';
+          await wlPool.execute(
+            "INSERT INTO reminder_logs (id, user_id, method, phone, message, status, provider_sid) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            [require('crypto').randomUUID(), user.id, 'SMS', user.phone, message, 'sent', data.message]
+          );
+          console.log(`✅ Auto SMS reminder sent to ${user.phone} (ReqID: ${data.message})`);
+        } else {
+          throw new Error(data.message || data.error || 'MSG91 API error');
         }
-
-        // Set 1-hour cooldown so we don't hammer Twilio on other errors
+      } catch (err) {
+        // Set 1-hour cooldown so we don't hammer MSG91 on other errors
         smsCooldown.set(user.id, Date.now() + 60 * 60 * 1000);
 
         await wlPool.execute(
           "INSERT INTO reminder_logs (id, user_id, method, phone, message, status, error_message) VALUES (?, ?, ?, ?, ?, ?, ?)",
-          [require('crypto').randomUUID(), user.id, 'SMS', user.phone, message, 'failed', friendlyError]
+          [require('crypto').randomUUID(), user.id, 'SMS', user.phone, message, 'failed', err.message]
         );
-        console.error(`❌ Auto SMS reminder failed for ${user.phone} [${code}]: ${friendlyError}`);
+        console.error(`❌ Auto SMS reminder failed for ${user.phone}: ${err.message}`);
       }
     }
   } catch (err) {

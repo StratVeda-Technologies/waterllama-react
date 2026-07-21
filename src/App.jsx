@@ -9,6 +9,12 @@ import {
   dbReady,
   isSupabaseConfigured,
   normalizePhoneNumber,
+  getMsg91TemplateId,
+  setMsg91TemplateId,
+  getMsg91SenderId,
+  setMsg91SenderId,
+  getMsg91PeId,
+  setMsg91PeId,
 } from './mysqlClient'
 import './App.css'
 import BulkSms from './BulkSms'
@@ -913,10 +919,10 @@ function App() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: 'var(--bg)', borderRadius: '8px', border: '1px solid var(--line)' }}>
                     <span style={{ fontSize: '1.5rem' }}>📲</span>
                     <div>
-                      <strong>SMS (Twilio via Supabase)</strong>
+                      <strong>SMS (MSG91 via Supabase)</strong>
                       <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: 'var(--muted)' }}>
                         {isSupabaseConfigured()
-                          ? '✅ Configured — SMS reminders will be sent via Supabase Edge Functions'
+                          ? '✅ Configured — SMS reminders sent via MSG91 through Supabase Edge Functions'
                           : '⚠ Not configured — Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to .env.local'}
                       </p>
                     </div>
@@ -926,20 +932,91 @@ function App() {
                   </div>
                 </div>
                 <p style={{ margin: '12px 0 0 0', fontSize: '0.8rem', color: 'var(--muted)' }}>
-                  <strong>Note:</strong> SMS reminders require a Twilio account with verified numbers (trial limitation).
                   For auto-reminders, SMS users will receive messages automatically every {reminderGap} hours.
                   WhatsApp auto-reminders open wa.me links (requires app to be open).
                 </p>
-                <div style={{ marginTop: '12px', padding: '12px', background: '#fffbeb', borderRadius: '8px', border: '1px solid #fde68a' }}>
-                  <p style={{ fontSize: '0.8rem', fontWeight: 700, marginBottom: '8px', color: '#92400e' }}>
-                    ⚠️ IMPORTANT: Twilio Trial Account Limitation
-                  </p>
-                  <p style={{ fontSize: '0.75rem', color: '#78350f', margin: 0 }}>
-                    <b>Trial accounts can ONLY send SMS to verified numbers.</b>
-                    Add recipient numbers in <b>Twilio Console → Phone Numbers → Verified Caller IDs</b>.
-                    <br/>Messages to unverified numbers are "accepted" by Twilio but <b>NEVER delivered</b>.
-                    <br/>Check actual delivery in <b>Twilio Console → Messaging → Logs</b>.
-                  </p>
+                <div style={{ marginTop: '16px', padding: '14px', background: 'var(--bg)', borderRadius: '10px', border: '1px solid var(--line)', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <div>
+                    <p style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px', color: 'var(--text)' }}>
+                      📋 DLT Template ID (Required for SMS delivery in India)
+                    </p>
+                    <p style={{ fontSize: '0.78rem', color: 'var(--muted)', marginBottom: '8px' }}>
+                      India's TRAI regulations require every SMS to use a DLT-registered template.
+                      Register at <strong>msg91.com → SMS → DLT Templates</strong>.
+                    </p>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <input
+                        id="msg91-template-id"
+                        type="text"
+                        placeholder="e.g. 1207163234567890123"
+                        defaultValue={getMsg91TemplateId()}
+                        style={{
+                          flex: 1, padding: '8px 12px', borderRadius: '8px',
+                          border: '1px solid var(--line)', background: 'var(--card)',
+                          color: 'var(--text)', fontSize: '0.85rem', fontFamily: 'monospace'
+                        }}
+                        onChange={e => setMsg91TemplateId(e.target.value.trim())}
+                      />
+                      {getMsg91TemplateId()
+                        ? <span style={{ color: '#16a34a', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>✅ Set</span>
+                        : <span style={{ color: '#dc2626', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>⚠ Not set</span>}
+                    </div>
+                  </div>
+
+                  <div style={{ borderTop: '1px solid var(--line)', paddingTop: '14px' }}>
+                    <p style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px', color: 'var(--text)' }}>
+                      🔑 MSG91 Sender ID
+                    </p>
+                    <p style={{ fontSize: '0.78rem', color: 'var(--muted)', marginBottom: '8px' }}>
+                      Enter the exact Sender ID registered and approved in your{' '}
+                      <strong>MSG91 Dashboard → SMS → Sender ID</strong>.
+                      This must match exactly — copy it from the MSG91 website.
+                    </p>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <input
+                        id="msg91-sender-id"
+                        type="text"
+                        placeholder="e.g. 8956455702"
+                        defaultValue={getMsg91SenderId()}
+                        style={{
+                          flex: 1, padding: '8px 12px', borderRadius: '8px',
+                          border: '1px solid var(--line)', background: 'var(--card)',
+                          color: 'var(--text)', fontSize: '0.85rem', fontFamily: 'monospace'
+                        }}
+                        onChange={e => setMsg91SenderId(e.target.value.trim())}
+                      />
+                      {getMsg91SenderId()
+                        ? <span style={{ color: '#16a34a', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>✅ Set</span>
+                        : <span style={{ color: '#dc2626', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>⚠ Not set</span>}
+                    </div>
+                  </div>
+
+                  <div style={{ borderTop: '1px solid var(--line)', paddingTop: '14px' }}>
+                    <p style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px', color: 'var(--text)' }}>
+                      🏢 DLT Entity / PE ID
+                    </p>
+                    <p style={{ fontSize: '0.78rem', color: 'var(--muted)', marginBottom: '8px' }}>
+                      Your registered <strong>Principal Entity ID</strong> from the DLT portal (e.g. Jio, Airtel, Vi).
+                      Required by TRAI — sent as <code>PE_ID</code> in every MSG91 request.
+                    </p>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <input
+                        id="msg91-pe-id"
+                        type="text"
+                        placeholder="e.g. 895645"
+                        defaultValue={getMsg91PeId()}
+                        style={{
+                          flex: 1, padding: '8px 12px', borderRadius: '8px',
+                          border: '1px solid var(--line)', background: 'var(--card)',
+                          color: 'var(--text)', fontSize: '0.85rem', fontFamily: 'monospace'
+                        }}
+                        onChange={e => setMsg91PeId(e.target.value.trim())}
+                      />
+                      {getMsg91PeId()
+                        ? <span style={{ color: '#16a34a', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>✅ Set</span>
+                        : <span style={{ color: '#dc2626', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>⚠ Not set</span>}
+                    </div>
+                  </div>
                 </div>
               </div>
             </section>
