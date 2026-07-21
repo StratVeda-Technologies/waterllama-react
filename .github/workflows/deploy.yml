@@ -57,9 +57,6 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
-        with:
-          retries: 3
-          retry_wait: 30
 
   # Deploy Supabase Edge Functions (requires Supabase CLI and secrets)
   deploy-edge-functions:
@@ -70,7 +67,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Setup Supabase CLI
-        uses: supabase/setup-cli@v1
+        uses: supabase/setup-cli@v3
         with:
           version: latest
       - name: Link Supabase project
