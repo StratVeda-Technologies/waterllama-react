@@ -399,10 +399,15 @@ function App() {
     } catch (err) {
       // sendReminderViaEdge throws for SMS failures — catch here to show error chip in UI
       console.error(`sendReminder ${notificationMethod} error:`, err)
-      const errMsg = err?.message ?? `Could not send ${notificationMethod}`
+      let errMsg = err?.message ?? `Could not send ${notificationMethod}`
+      if (errMsg.toLowerCase().includes('authenticate') || errMsg.includes('20003')) {
+        errMsg = 'Twilio Auth Error: Paste your new Auth Token in Settings below'
+      } else if (errMsg.includes('21608') || errMsg.toLowerCase().includes('unverified')) {
+        errMsg = 'Twilio Trial Error: Add recipient to Twilio Console → Verified Caller IDs'
+      }
       setAutoSendError(errMsg)
       setAutoSendStatus('error')
-      setTimeout(() => setAutoSendStatus('idle'), 8000)
+      setTimeout(() => setAutoSendStatus('idle'), 10000)
     }
   }
 
