@@ -102,13 +102,14 @@ export default function BulkSms() {
   const [showAddContact, setShowAddContact] = useState(false)
   const [newName, setNewName] = useState('')
   const [newPhone, setNewPhone] = useState('')
+  const [countryCode, setCountryCode] = useState('+91')
   const [newGroup, setNewGroup] = useState('General')
 
   const handleAddContact = () => {
     if (!newName || !newPhone) return
-    const phoneNum = `+91${newPhone}`
+    const phoneNum = `${countryCode}${newPhone}`
     if (!isValidPhone(phoneNum)) {
-      alert('Please enter a valid 10-digit Indian mobile number')
+      alert(`Please enter a valid mobile number with country code (${countryCode})`)
       return
     }
     const newContact = {
@@ -473,7 +474,18 @@ export default function BulkSms() {
                     onChange={e => setNewName(e.target.value)}
                   />
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
-                    <span style={{ padding: '10px 12px', background: 'var(--soft)', borderRadius: '8px', border: '1px solid var(--line)', fontWeight: 600, color: 'var(--text)', fontSize: '0.95rem' }}>+91</span>
+                    <select
+                      className="sms-select"
+                      style={{ width: '100px', fontWeight: 600 }}
+                      value={countryCode}
+                      onChange={e => setCountryCode(e.target.value)}
+                    >
+                      <option value="+91">🇮🇳 +91</option>
+                      <option value="+1">🇺🇸 +1</option>
+                      <option value="+44">🇬🇧 +44</option>
+                      <option value="+61">🇦🇺 +61</option>
+                      <option value="+971">🇦🇪 +971</option>
+                    </select>
                     <input
                       type="tel"
                       placeholder="9876543210"

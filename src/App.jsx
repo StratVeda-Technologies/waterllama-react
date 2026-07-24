@@ -15,6 +15,8 @@ import {
   setMsg91SenderId,
   getMsg91PeId,
   setMsg91PeId,
+  getTwilioConfig,
+  setTwilioConfig,
 } from './mysqlClient'
 import './App.css'
 import BulkSms from './BulkSms'
@@ -159,6 +161,12 @@ function App() {
   const [autoSendError, setAutoSendError] = useState('')
   const [lastAutoSent, setLastAutoSent] = useState(stored?.lastAutoSent ?? null) // ISO string
   const [nextReminderIn, setNextReminderIn] = useState(null) // seconds until next fire
+
+  // Twilio credentials state
+  const initialTwilio = getTwilioConfig()
+  const [twilioSid, setTwilioSid] = useState(initialTwilio.sid)
+  const [twilioToken, setTwilioToken] = useState(initialTwilio.token)
+  const [twilioFrom, setTwilioFrom] = useState(initialTwilio.from)
 
   // Refs for auto-reminder engine (prevent stale closure + duplicate sends)
   const isSendingRef = useRef(false)   // guard: only one send at a time
@@ -671,14 +679,29 @@ function App() {
                   />
                 </label>
                 <label>
-                  SMS Mobile Number (+91 India)
+                  SMS Mobile Number
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
-                    <span style={{ padding: '8px 12px', background: 'var(--soft)', borderRadius: '8px', border: '1px solid var(--line)', fontWeight: 600, color: 'var(--text)', fontSize: '0.95rem' }}>+91</span>
+                    <select
+                      value={phone.match(/^\+\d+/)?.[0] || '+91'}
+                      onChange={(e) => {
+                        const newCode = e.target.value;
+                        const digits = phone.replace(/^\+\d+/, '').replace(/\D/g, '');
+                        setPhone(`${newCode}${digits}`);
+                      }}
+                      style={{ padding: '8px 12px', background: 'var(--soft)', borderRadius: '8px', border: '1px solid var(--line)', fontWeight: 600, color: 'var(--text)', fontSize: '0.95rem' }}
+                    >
+                      <option value="+91">🇮🇳 +91</option>
+                      <option value="+1">🇺🇸 +1</option>
+                      <option value="+44">🇬🇧 +44</option>
+                      <option value="+61">🇦🇺 +61</option>
+                      <option value="+971">🇦🇪 +971</option>
+                    </select>
                     <input
-                      value={phone.replace(/^\+91/, '')}
+                      value={phone.replace(/^\+\d+/, '')}
                       onChange={(event) => {
+                        const code = phone.match(/^\+\d+/)?.[0] || '+91';
                         const digits = event.target.value.replace(/\D/g, '').slice(0, 10);
-                        setPhone(digits ? `+91${digits}` : '+91');
+                        setPhone(`${code}${digits}`);
                       }}
                       placeholder="9876543210"
                       type="tel"
@@ -687,7 +710,7 @@ function App() {
                     />
                   </div>
                   <p style={{ fontSize: '0.75rem', color: 'var(--muted)', marginTop: '6px', marginBottom: 0 }}>
-                    Fixed country code +91 for Indian mobile numbers
+                    Select country code and enter 10-digit mobile number
                   </p>
                 </label>
               </div>
@@ -950,6 +973,74 @@ function App() {
                   For auto-reminders, SMS users will receive messages automatically every {reminderGap} hours.
                   WhatsApp auto-reminders open wa.me links (requires app to be open).
                 </p>
+                <div style={{ marginTop: '16px', padding: '14px', background: 'var(--bg)', borderRadius: '10px', border: '1.5px solid var(--brand)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <p style={{ fontSize: '0.9rem', fontWeight: 800, margin: 0, color: 'var(--brand-strong)' }}>
+                    ⚡ Twilio SMS API Credentials (Required for SMS)
+                  </p>
+                  <p style={{ fontSize: '0.78rem', color: 'var(--muted)', margin: 0 }}>
+                    Enter your new rotated <strong>Auth Token</strong> and <strong>Account SID</strong> from your <a href="https://console.twilio.com" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--brand)', textDecoration: 'underline' }}>Twilio Console</a>.
+                  </p>
+                  <div>
+                    <label style={{ fontSize: '0.78rem', fontWeight: 700, display: 'block', marginBottom: '4px' }}>Twilio Account SID</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. ACa9a843c3410a82db219187d42f0cc36e"
+                      value={twilioSid}
+                      onChange={e => {
+                        const val = e.target.value.trim()
+                        setTwilioSid(val)
+                        setTwilioConfig(val, twilioToken, twilioFrom)
+                      }}
+                      style={{
+                        width: '100%', padding: '8px 12px', borderRadius: '8px',
+                        border: '1px solid var(--line)', background: 'var(--card)',
+                        color: 'var(--text)', fontSize: '0.85rem', fontFamily: 'monospace'
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.78rem', fontWeight: 700, display: 'block', marginBottom: '4px' }}>New Twilio Auth Token</label>
+                    <input
+                      type="password"
+                      placeholder="Paste new Auth Token from Console"
+                      value={twilioToken}
+                      onChange={e => {
+                        const val = e.target.value.trim()
+                        setTwilioToken(val)
+                        setTwilioConfig(twilioSid, val, twilioFrom)
+                      }}
+                      style={{
+                        width: '100%', padding: '8px 12px', borderRadius: '8px',
+                        border: '1px solid var(--line)', background: 'var(--card)',
+                        color: 'var(--text)', fontSize: '0.85rem', fontFamily: 'monospace'
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.78rem', fontWeight: 700, display: 'block', marginBottom: '4px' }}>Twilio Phone Number (From)</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. +16187536219"
+                      value={twilioFrom}
+                      onChange={e => {
+                        const val = e.target.value.trim()
+                        setTwilioFrom(val)
+                        setTwilioConfig(twilioSid, twilioToken, val)
+                      }}
+                      style={{
+                        width: '100%', padding: '8px 12px', borderRadius: '8px',
+                        border: '1px solid var(--line)', background: 'var(--card)',
+                        color: 'var(--text)', fontSize: '0.85rem', fontFamily: 'monospace'
+                      }}
+                    />
+                  </div>
+                  {twilioSid && twilioToken ? (
+                    <span style={{ color: '#16a34a', fontSize: '0.8rem', fontWeight: 600 }}>✅ Twilio Credentials Saved</span>
+                  ) : (
+                    <span style={{ color: '#dc2626', fontSize: '0.8rem', fontWeight: 600 }}>⚠ Please enter your new rotated Twilio Auth Token above</span>
+                  )}
+                </div>
+
                 <div style={{ marginTop: '16px', padding: '14px', background: 'var(--bg)', borderRadius: '10px', border: '1px solid var(--line)', display: 'flex', flexDirection: 'column', gap: '14px' }}>
                   <div>
                     <p style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px', color: 'var(--text)' }}>

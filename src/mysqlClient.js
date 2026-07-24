@@ -22,15 +22,31 @@ let MSG91_TEMPLATE_ID = import.meta.env?.VITE_MSG91_TEMPLATE_ID || localStorage.
 // DLT Entity ID (Principal Entity / PE ID) — required by TRAI.
 let MSG91_PE_ID = import.meta.env?.VITE_MSG91_PE_ID || localStorage.getItem('msg91_pe_id') || '';
 
-// Twilio credentials — read strictly from env vars or localStorage (never hardcoded in source)
-const TWILIO_SID   = import.meta.env?.VITE_TWILIO_ACCOUNT_SID  || localStorage.getItem('twilio_sid') || '';
-const TWILIO_TOKEN = import.meta.env?.VITE_TWILIO_AUTH_TOKEN    || localStorage.getItem('twilio_token') || '';
-const TWILIO_FROM  = import.meta.env?.VITE_TWILIO_PHONE_NUMBER  || localStorage.getItem('twilio_from') || '';
+// Twilio credentials — read strictly from env vars or localStorage
+let TWILIO_SID   = import.meta.env?.VITE_TWILIO_ACCOUNT_SID  || localStorage.getItem('twilio_sid') || '';
+let TWILIO_TOKEN = import.meta.env?.VITE_TWILIO_AUTH_TOKEN    || localStorage.getItem('twilio_token') || '';
+let TWILIO_FROM  = import.meta.env?.VITE_TWILIO_PHONE_NUMBER  || localStorage.getItem('twilio_from') || '';
+
+export function setTwilioConfig(sid, token, from) {
+  TWILIO_SID = sid || '';
+  TWILIO_TOKEN = token || '';
+  TWILIO_FROM = from || '';
+  if (sid) localStorage.setItem('twilio_sid', sid); else localStorage.removeItem('twilio_sid');
+  if (token) localStorage.setItem('twilio_token', token); else localStorage.removeItem('twilio_token');
+  if (from) localStorage.setItem('twilio_from', from); else localStorage.removeItem('twilio_from');
+}
+
+export function getTwilioConfig() {
+  return { sid: TWILIO_SID, token: TWILIO_TOKEN, from: TWILIO_FROM };
+}
 
 // Helper: returns Twilio payload fields for SMS edge functions
 function twilioFallback() {
-  if (!TWILIO_SID || !TWILIO_TOKEN) return {};
-  return { _twilioSid: TWILIO_SID, _twilioToken: TWILIO_TOKEN, _twilioFrom: TWILIO_FROM };
+  const sid = TWILIO_SID || localStorage.getItem('twilio_sid') || '';
+  const token = TWILIO_TOKEN || localStorage.getItem('twilio_token') || '';
+  const from = TWILIO_FROM || localStorage.getItem('twilio_from') || '';
+  if (!sid || !token) return {};
+  return { _twilioSid: sid, _twilioToken: token, _twilioFrom: from };
 }
 
 export function setMsg91TemplateId(id) {
