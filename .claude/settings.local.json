@@ -43,7 +43,12 @@
       "Bash(git pull *)",
       "Bash(gh secret *)",
       "Bash(node -e \"const fs = require\\('fs'\\); const content = fs.readFileSync\\('server.js', 'utf8'\\); const lines = content.split\\('\\\\n'\\); for \\(let i = 668; i < 695; i++\\) { console.log\\(i+1, JSON.stringify\\(lines[i]\\)\\); }\")",
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "PowerShell(Get-Process *)",
+      "PowerShell(Invoke-RestMethod -Uri \"http://localhost:5000/send-bulk-sms\" -Method Post -ContentType \"application/json\" -Body '{\"recipients\": [\"+919876543210\"], \"message\": \"Test SMS from MSG91\", \"senderName\": \"Aqualama\"}')",
+      "PowerShell(Invoke-RestMethod -Uri \"https://api.ipify.org\" -Method Get)",
+      "PowerShell(Invoke-RestMethod -Uri \"https://api64.ipify.org\" -Method Get)",
+      "Bash(git ls-remote *)"
     ]
   }
 }
