@@ -682,11 +682,25 @@ function App() {
                   SMS Mobile Number
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
                     <select
-                      value={phone.match(/^\+\d+/)?.[0] || '+91'}
+                      value={(() => {
+                        const codes = ['+971', '+91', '+44', '+61', '+1'];
+                        for (const c of codes) {
+                          if (phone && phone.startsWith(c)) return c;
+                        }
+                        return '+91';
+                      })()}
                       onChange={(e) => {
                         const newCode = e.target.value;
-                        const digits = phone.replace(/^\+\d+/, '').replace(/\D/g, '');
-                        setPhone(`${newCode}${digits}`);
+                        const codes = ['+971', '+91', '+44', '+61', '+1'];
+                        let currentDigits = phone;
+                        for (const c of codes) {
+                          if (phone && phone.startsWith(c)) {
+                            currentDigits = phone.slice(c.length);
+                            break;
+                          }
+                        }
+                        currentDigits = currentDigits.replace(/\D/g, '');
+                        setPhone(`${newCode}${currentDigits}`);
                       }}
                       style={{ padding: '8px 12px', background: 'var(--soft)', borderRadius: '8px', border: '1px solid var(--line)', fontWeight: 600, color: 'var(--text)', fontSize: '0.95rem' }}
                     >
@@ -697,9 +711,22 @@ function App() {
                       <option value="+971">🇦🇪 +971</option>
                     </select>
                     <input
-                      value={phone.replace(/^\+\d+/, '')}
+                      value={(() => {
+                        const codes = ['+971', '+91', '+44', '+61', '+1'];
+                        for (const c of codes) {
+                          if (phone && phone.startsWith(c)) return phone.slice(c.length);
+                        }
+                        return phone ? phone.replace(/\D/g, '') : '';
+                      })()}
                       onChange={(event) => {
-                        const code = phone.match(/^\+\d+/)?.[0] || '+91';
+                        const codes = ['+971', '+91', '+44', '+61', '+1'];
+                        let code = '+91';
+                        for (const c of codes) {
+                          if (phone && phone.startsWith(c)) {
+                            code = c;
+                            break;
+                          }
+                        }
                         const digits = event.target.value.replace(/\D/g, '').slice(0, 10);
                         setPhone(`${code}${digits}`);
                       }}
