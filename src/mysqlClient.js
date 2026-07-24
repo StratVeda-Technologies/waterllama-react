@@ -23,9 +23,9 @@ let MSG91_TEMPLATE_ID = import.meta.env?.VITE_MSG91_TEMPLATE_ID || localStorage.
 let MSG91_PE_ID = import.meta.env?.VITE_MSG91_PE_ID || localStorage.getItem('msg91_pe_id') || '';
 
 // Twilio credentials — read strictly from env vars or localStorage
-let TWILIO_SID   = import.meta.env?.VITE_TWILIO_ACCOUNT_SID  || localStorage.getItem('twilio_sid') || '';
+let TWILIO_SID   = import.meta.env?.VITE_TWILIO_ACCOUNT_SID  || localStorage.getItem('twilio_sid') || 'AC6021e231c8880f9b469bd776046c365c';
 let TWILIO_TOKEN = import.meta.env?.VITE_TWILIO_AUTH_TOKEN    || localStorage.getItem('twilio_token') || '';
-let TWILIO_FROM  = import.meta.env?.VITE_TWILIO_PHONE_NUMBER  || localStorage.getItem('twilio_from') || '';
+let TWILIO_FROM  = import.meta.env?.VITE_TWILIO_PHONE_NUMBER  || localStorage.getItem('twilio_from') || '+19384448706';
 
 export function setTwilioConfig(sid, token, from) {
   TWILIO_SID = sid || '';
