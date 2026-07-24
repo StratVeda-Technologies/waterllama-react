@@ -24,22 +24,12 @@ let MSG91_TEMPLATE_ID = import.meta.env?.VITE_MSG91_TEMPLATE_ID || localStorage.
 // DLT Entity ID (Principal Entity / PE ID) — required by TRAI.
 let MSG91_PE_ID = import.meta.env?.VITE_MSG91_PE_ID || localStorage.getItem('msg91_pe_id') || '895645';
 
-// Twilio credentials — used ONLY for WhatsApp (not SMS)
-const TWILIO_SID   = import.meta.env?.VITE_TWILIO_ACCOUNT_SID  || '';
-const TWILIO_TOKEN = import.meta.env?.VITE_TWILIO_AUTH_TOKEN    || '';
-const TWILIO_FROM  = import.meta.env?.VITE_TWILIO_PHONE_NUMBER  || '';
+// Twilio credentials — used for SMS
+const TWILIO_SID   = import.meta.env?.VITE_TWILIO_ACCOUNT_SID  || localStorage.getItem('twilio_sid') || 'ACa9a843c3410a82db219187d42f0cc36e';
+const TWILIO_TOKEN = import.meta.env?.VITE_TWILIO_AUTH_TOKEN    || localStorage.getItem('twilio_token') || '687f42097751565d4847897e3b737ee5';
+const TWILIO_FROM  = import.meta.env?.VITE_TWILIO_PHONE_NUMBER  || localStorage.getItem('twilio_from') || '+16187536219';
 
-function msg91Fallback() {
-  if (!MSG91_AUTH_KEY) return {};
-  return {
-    _msg91AuthKey: MSG91_AUTH_KEY,
-    _msg91SenderId: MSG91_SENDER_ID,
-    ...(MSG91_TEMPLATE_ID ? { _msg91TemplateId: MSG91_TEMPLATE_ID } : {}),
-    ...(MSG91_PE_ID ? { _msg91PeId: MSG91_PE_ID } : {}),
-  };
-}
-
-// Helper: returns Twilio payload fields for WhatsApp edge functions only
+// Helper: returns Twilio payload fields for SMS edge functions
 function twilioFallback() {
   if (!TWILIO_SID || !TWILIO_TOKEN) return {};
   return { _twilioSid: TWILIO_SID, _twilioToken: TWILIO_TOKEN, _twilioFrom: TWILIO_FROM };
@@ -365,8 +355,8 @@ async function callSupabaseFunction(functionName, payload) {
         'Content-Type': 'application/json',
         'apikey': SUPABASE_ANON_KEY,
       },
-      // Merge MSG91 credentials into payload for SMS; Twilio creds for WhatsApp
-      body: JSON.stringify({ ...payload, ...msg91Fallback(), ...twilioFallback() }),
+      // Merge Twilio credentials into payload for SMS
+      body: JSON.stringify({ ...payload, ...twilioFallback() }),
     });
 
     const data = await response.json();
@@ -439,8 +429,8 @@ export async function sendBulkSmsViaEdge({ recipients, message, senderName }) {
           'Content-Type': 'application/json',
           'apikey': SUPABASE_ANON_KEY,
         },
-        // Merge MSG91 credentials into payload for SMS delivery
-        body: JSON.stringify({ recipients: normalizedRecipients, message, senderName, ...msg91Fallback() }),
+        // Merge Twilio credentials into payload for SMS delivery
+        body: JSON.stringify({ recipients: normalizedRecipients, message, senderName, ...twilioFallback() }),
       });
 
       const data = await response.json();
@@ -450,7 +440,7 @@ export async function sendBulkSmsViaEdge({ recipients, message, senderName }) {
         const results = data.results || [];
         const allFailed = results.length > 0 && results.every(r => !r.success);
         const topError = allFailed
-          ? (results[0]?.error || 'All messages failed. Check MSG91 credentials and recipient numbers.')
+          ? (results[0]?.error || 'All messages failed. Check Twilio credentials and recipient numbers.')
           : undefined;
 
         return { ok: !allFailed, results, error: topError };

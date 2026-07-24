@@ -469,39 +469,52 @@ app.get('/send-history', async (req, res) => {
 });
 
 app.post('/send-bulk-sms', async (req, res) => {
-  const { recipients, message, senderName, _msg91TemplateId, _msg91PeId } = req.body;
+  const { recipients, message, senderName, _twilioSid, _twilioToken, _twilioFrom } = req.body;
   if (!Array.isArray(recipients) || recipients.length === 0 || !message) {
     return res.status(400).json({ error: 'Request body must include recipients array and message.' });
   }
-  if (!msg91AuthKey) return res.status(503).json({ error: 'MSG91 not configured' });
 
-  const templateId = _msg91TemplateId || msg91TemplateId;
-  const peId       = _msg91PeId       || msg91PeId;
+  const client = (_twilioSid && _twilioToken) ? twilio(_twilioSid, _twilioToken) : twilioClient;
+  const from = _twilioFrom || fromNumber || '+16187536219';
+
+  if (!client || !from) {
+    return res.status(503).json({ error: 'Twilio SMS service not configured.' });
+  }
 
   const results = [];
   for (const phone of recipients) {
+    let cleanPhone = phone.replace(/[^\d+]/g, '');
+    if (!cleanPhone.startsWith('+')) {
+      cleanPhone = cleanPhone.startsWith('91') ? '+' + cleanPhone : '+91' + cleanPhone;
+    }
+
     try {
-      const data = await sendMsg91Sms(phone, message, templateId, peId);
-      if (data.type === 'success' || data.type === 'Success') {
-        results.push({
-          phone,
-          success: true,
-          delivered: false,
-          sid: data.message,
-          status: 'sent',
-          note: 'Message accepted by MSG91 for delivery.'
-        });
-      } else {
-        const errorMsg = data.message || data.error || 'MSG91 API error';
-        results.push({
-          phone,
-          success: false,
-          error: errorMsg,
-          code: data.type || 'error'
-        });
-      }
+      const smsPayload = { to: cleanPhone, body: message };
+      if (messagingServiceSid) smsPayload.messagingServiceSid = messagingServiceSid;
+      else smsPayload.from = from;
+
+      const twMsg = await client.messages.create(smsPayload);
+      results.push({
+        phone: cleanPhone,
+        success: true,
+        delivered: true,
+        sid: twMsg.sid,
+        status: twMsg.status,
+        note: 'Sent via Twilio.'
+      });
     } catch (err) {
-      results.push({ phone, success: false, error: err.message });
+      let friendlyError = err.message || 'Twilio SMS error';
+      if (err.code === 21608) {
+        friendlyError = 'Cannot send to unverified number (Twilio trial). Verify caller ID in Twilio console.';
+      } else if (err.code === 21211) {
+        friendlyError = 'Invalid phone number format. Use international E.164 format (+919876543210).';
+      }
+      results.push({
+        phone: cleanPhone,
+        success: false,
+        error: friendlyError,
+        code: err.code
+      });
     }
   }
 
@@ -690,28 +703,31 @@ async function checkAndSendReminders() {
       const progress = Math.min(100, Math.round((totalIntake / dailyGoal) * 100));
       const message = `Hi ${user.name}, time to drink water! You have completed ${progress}% of your ${(dailyGoal / 1000).toFixed(1)}L hydration goal today. Keep it up! 💧`;
 
-      if (!msg91AuthKey) {
-        console.warn('⚠️ MSG91 not configured — skipping auto SMS reminder.');
+      if (!twilioClient || (!fromNumber && !messagingServiceSid)) {
+        console.warn('⚠️ Twilio client not configured — skipping auto SMS reminder.');
         continue;
       }
 
       console.log(`⏰ Sending automatic SMS reminder to ${user.name} (${user.phone})`);
 
       try {
-        // SMS only — via MSG91 (DLT compliant: template ID + entity ID)
-        const data = await sendMsg91Sms(user.phone, message, msg91TemplateId, msg91PeId);
-        if (data.type === 'success' || data.type === 'Success') {
-          // Clear cooldown on success
-          smsCooldown.delete(user.id);
-
-          await wlPool.execute(
-            "INSERT INTO reminder_logs (id, user_id, method, phone, message, status, provider_sid) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            [require('crypto').randomUUID(), user.id, 'SMS', user.phone, message, 'sent', data.message]
-          );
-          console.log(`✅ Auto SMS reminder sent to ${user.phone} (ReqID: ${data.message})`);
-        } else {
-          throw new Error(data.message || data.error || 'MSG91 API error');
+        let cleanPhone = user.phone.replace(/[^\d+]/g, '');
+        if (!cleanPhone.startsWith('+')) {
+          cleanPhone = cleanPhone.startsWith('91') ? '+' + cleanPhone : '+91' + cleanPhone;
         }
+
+        const smsPayload = { to: cleanPhone, body: message };
+        if (messagingServiceSid) smsPayload.messagingServiceSid = messagingServiceSid;
+        else smsPayload.from = fromNumber || '+16187536219';
+
+        const twMsg = await twilioClient.messages.create(smsPayload);
+        smsCooldown.delete(user.id);
+
+        await wlPool.execute(
+          "INSERT INTO reminder_logs (id, user_id, method, phone, message, status, provider_sid) VALUES (?, ?, ?, ?, ?, ?, ?)",
+          [require('crypto').randomUUID(), user.id, 'SMS', user.phone, message, 'sent', twMsg.sid]
+        );
+        console.log(`✅ Auto SMS reminder sent to ${user.phone} via Twilio (SID: ${twMsg.sid})`);
       } catch (err) {
         // Set 1-hour cooldown so we don't hammer MSG91 on other errors
         smsCooldown.set(user.id, Date.now() + 60 * 60 * 1000);

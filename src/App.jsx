@@ -144,10 +144,8 @@ function App() {
   const [reminderGap, setReminderGap] = useState(stored?.reminderGap ?? 2)
   const [theme, setTheme] = useState(stored?.theme ?? 'Lagoon')
   const [userName, setUserName] = useState(stored?.userName ?? 'Kailash')
-  const [phone, setPhone] = useState(stored?.phone ?? '')
-  const [notificationMethod, setNotificationMethod] = useState(
-    stored?.notificationMethod ?? 'WhatsApp',
-  )
+  const [phone, setPhone] = useState(stored?.phone || '+919876543210')
+  const [notificationMethod, setNotificationMethod] = useState('SMS')
   const [lastReminder, setLastReminder] = useState(stored?.lastReminder ?? '')
   const [isPremium, setIsPremium] = useState(stored?.isPremium ?? false)
   const [premiumPlan, setPremiumPlan] = useState(stored?.premiumPlan ?? 'Free')
@@ -673,13 +671,24 @@ function App() {
                   />
                 </label>
                 <label>
-                  WhatsApp or SMS number
-                  <input
-                    value={phone}
-                    onChange={(event) => setPhone(event.target.value)}
-                    placeholder="+919876543210"
-                    type="tel"
-                  />
+                  SMS Mobile Number (+91 India)
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
+                    <span style={{ padding: '8px 12px', background: 'var(--soft)', borderRadius: '8px', border: '1px solid var(--line)', fontWeight: 600, color: 'var(--text)', fontSize: '0.95rem' }}>+91</span>
+                    <input
+                      value={phone.replace(/^\+91/, '')}
+                      onChange={(event) => {
+                        const digits = event.target.value.replace(/\D/g, '').slice(0, 10);
+                        setPhone(digits ? `+91${digits}` : '+91');
+                      }}
+                      placeholder="9876543210"
+                      type="tel"
+                      style={{ flex: 1, fontSize: '0.95rem' }}
+                      maxLength={10}
+                    />
+                  </div>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--muted)', marginTop: '6px', marginBottom: 0 }}>
+                    Fixed country code +91 for Indian mobile numbers
+                  </p>
                 </label>
               </div>
               <div className="profile-grid">
@@ -777,21 +786,14 @@ function App() {
             <section className="reminder-panel">
               <p className="eyebrow">Auto-delivery engine</p>
               <h2>Smart hydration reminders every {reminderGap} hours.</h2>
-              <p>Reminders fire automatically via {notificationMethod}. Enable them, add your number, and the app handles the rest.</p>
+              <p>Reminders fire automatically via Twilio SMS. Enable them, add your +91 mobile number, and the app handles the rest.</p>
 
               <div className="method-toggle">
-                {['WhatsApp', 'SMS'].map((method) => (
-                  <button
-                    className={notificationMethod === method ? 'active' : ''}
-                    key={method}
-                    onClick={() => setNotificationMethod(method)}
-                    type="button"
-                  >
-                    {method}
-                  </button>
-                ))}
-                <span className="method-note" title="WhatsApp works client-side via wa.me. SMS requires Supabase Edge Functions + Twilio.">
-                  💡 WhatsApp: free (wa.me) | SMS: requires Supabase + Twilio
+                <button className="active" type="button">
+                  📲 Twilio SMS
+                </button>
+                <span className="method-note">
+                  💡 Powered by Twilio SMS Service
                 </span>
               </div>
 

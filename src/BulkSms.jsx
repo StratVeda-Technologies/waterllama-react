@@ -4,9 +4,9 @@ import './BulkSms.css'
 
 const DEFAULT_CONTACTS = [
   { id: 1, name: 'Kailash', phone: '+919876543210', group: 'VIP', status: 'active', selected: true },
-  { id: 2, name: 'John Doe', phone: '+1234567890', group: 'Leads', status: 'active', selected: true },
-  { id: 3, name: 'Alice Smith', phone: '+1987654321', group: 'VIP', status: 'active', selected: false },
-  { id: 4, name: 'Bob Johnson', phone: '+1122334455', group: 'General', status: 'active', selected: false }
+  { id: 2, name: 'Rahul Sharma', phone: '+919876543211', group: 'Leads', status: 'active', selected: true },
+  { id: 3, name: 'Priya Patel', phone: '+919876543212', group: 'VIP', status: 'active', selected: false },
+  { id: 4, name: 'Amit Kumar', phone: '+919876543213', group: 'General', status: 'active', selected: false }
 ]
 
 const DEFAULT_TEMPLATES = [
@@ -46,7 +46,7 @@ export default function BulkSms() {
   const [message, setMessage] = useState('')
   const [senderName, setSenderName] = useState('Aqualama')
   const [campaignName, setCampaignName] = useState('Hydration Push Campaign')
-  const [messageType, setMessageType] = useState('whatsapp') // 'whatsapp' | 'sms'
+  const [messageType, setMessageType] = useState('sms') // 'sms'
 
   // Contacts state
   const [contacts, setContacts] = useState(() => loadStoredData(STORAGE_KEYS.contacts, DEFAULT_CONTACTS))
@@ -106,9 +106,9 @@ export default function BulkSms() {
 
   const handleAddContact = () => {
     if (!newName || !newPhone) return
-    const phoneNum = newPhone.startsWith('+') ? newPhone : `+${newPhone}`
+    const phoneNum = `+91${newPhone}`
     if (!isValidPhone(phoneNum)) {
-      alert('Please enter a valid E.164 phone number (e.g., +919876543210)')
+      alert('Please enter a valid 10-digit Indian mobile number')
       return
     }
     const newContact = {
@@ -312,10 +312,7 @@ export default function BulkSms() {
           <div>
             <h2 className="sms-page-title">Compose Bulk Message</h2>
             <p className="sms-page-subtitle">
-              {messageType === 'whatsapp'
-                ? 'WhatsApp via wa.me links — free, no backend needed.'
-                : 'Send SMS campaigns via Supabase Edge Functions or local Node server (port 5000) → Twilio.'
-              }
+              Send bulk SMS campaigns using Twilio API (+91 Indian numbers).
             </p>
 
             <div className="sms-grid">
@@ -332,7 +329,7 @@ export default function BulkSms() {
                   </div>
 
                   <div className="sms-form-group">
-                    <label>Sender Name (WhatsApp Business / SMS)</label>
+                    <label>Sender Name / Company Name</label>
                     <input
                       type="text"
                       className="sms-input"
@@ -342,27 +339,10 @@ export default function BulkSms() {
                   </div>
 
                   <div className="sms-form-group">
-                    <label>Message Type</label>
+                    <label>Channel</label>
                     <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
-                        <input
-                          type="radio"
-                          name="messageType"
-                          value="whatsapp"
-                          checked={messageType === 'whatsapp'}
-                          onChange={() => setMessageType('whatsapp')}
-                        />
-                        <span>📱 WhatsApp (Free via wa.me — no backend needed)</span>
-                      </label>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
-                        <input
-                          type="radio"
-                          name="messageType"
-                          value="sms"
-                          checked={messageType === 'sms'}
-                          onChange={() => setMessageType('sms')}
-                        />
-                        <span>📲 SMS (Twilio via Supabase — requires credits)</span>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'default' }}>
+                        <span>📲 Twilio SMS</span>
                       </label>
                     </div>
                   </div>
@@ -461,7 +441,7 @@ export default function BulkSms() {
             {showAddContact && (
               <div className="sms-card" style={{ background: 'var(--soft)', border: '1.5px solid var(--brand)' }}>
                 <h3 style={{ margin: '0 0 12px 0', fontSize: '1rem' }}>New Contact Details</h3>
-                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
                   <input
                     type="text"
                     placeholder="Name"
@@ -470,14 +450,18 @@ export default function BulkSms() {
                     value={newName}
                     onChange={e => setNewName(e.target.value)}
                   />
-                  <input
-                    type="tel"
-                    placeholder="Phone number (+E.164)"
-                    className="sms-input"
-                    style={{ flex: 1 }}
-                    value={newPhone}
-                    onChange={e => setNewPhone(e.target.value)}
-                  />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
+                    <span style={{ padding: '10px 12px', background: 'var(--soft)', borderRadius: '8px', border: '1px solid var(--line)', fontWeight: 600, color: 'var(--text)', fontSize: '0.95rem' }}>+91</span>
+                    <input
+                      type="tel"
+                      placeholder="9876543210"
+                      className="sms-input"
+                      style={{ flex: 1 }}
+                      value={newPhone}
+                      onChange={e => setNewPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                      maxLength={10}
+                    />
+                  </div>
                   <select
                     className="sms-select"
                     style={{ width: '120px' }}
@@ -491,6 +475,9 @@ export default function BulkSms() {
                   <button className="sms-btn sms-btn-primary" onClick={handleAddContact}>Save</button>
                   <button className="sms-btn sms-btn-outline" onClick={() => setShowAddContact(false)}>Cancel</button>
                 </div>
+                <p style={{ fontSize: '0.75rem', color: 'var(--muted)', marginTop: '8px', marginBottom: 0 }}>
+                  Enter 10-digit Indian mobile number (auto-prefixed with +91)
+                </p>
               </div>
             )}
 

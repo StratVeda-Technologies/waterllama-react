@@ -6,16 +6,20 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 // @ts-ignore - Deno global exists at runtime in Supabase Edge Functions
 declare const Deno: { env: { get: (key: string) => string | undefined } };
 
-// SMS provider: MSG91
-// Priority for MSG91 credentials:
-//   1. Passed in request body (_msg91AuthKey, _msg91SenderId, _msg91TemplateId)
-//   2. Supabase secrets (MSG91_AUTH_KEY, MSG91_SENDER_ID, MSG91_TEMPLATE_ID)
-
+// SMS provider: Twilio API
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
+
+function normalizePhoneNumber(phone: string): string {
+  let cleaned = phone.replace(/[^\d+]/g, '');
+  if (cleaned.startsWith('+')) return cleaned;
+  if (cleaned.startsWith('00')) return '+' + cleaned.substring(2);
+  if (cleaned.length === 10 && /^[6-9]\d{9}$/.test(cleaned)) return '+91' + cleaned;
+  return '+' + cleaned;
+}
 
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -25,8 +29,7 @@ serve(async (req: Request) => {
   try {
     const {
       recipients, message, senderName, campaignId,
-      // MSG91 credentials
-      _msg91AuthKey, _msg91SenderId, _msg91TemplateId, _msg91PeId,
+      _twilioSid, _twilioToken, _twilioFrom,
     } = await req.json();
 
     if (!Array.isArray(recipients) || recipients.length === 0 || !message) {
@@ -36,15 +39,14 @@ serve(async (req: Request) => {
       );
     }
 
-    // Resolve MSG91 credentials
-    const authKey    = _msg91AuthKey    || Deno.env.get("MSG91_AUTH_KEY");
-    const senderId   = _msg91SenderId   || Deno.env.get("MSG91_SENDER_ID") || "8956455702";
-    const templateId = _msg91TemplateId || Deno.env.get("MSG91_TEMPLATE_ID");
-    const peId       = _msg91PeId       || Deno.env.get("MSG91_PE_ID");
+    // Resolve Twilio credentials
+    const accountSid = _twilioSid || Deno.env.get("TWILIO_ACCOUNT_SID");
+    const authToken  = _twilioToken || Deno.env.get("TWILIO_AUTH_TOKEN");
+    const fromSms    = _twilioFrom  || Deno.env.get("TWILIO_FROM_SMS") || Deno.env.get("TWILIO_PHONE_NUMBER");
 
-    if (!authKey) {
+    if (!accountSid || !authToken || !fromSms) {
       return new Response(
-        JSON.stringify({ error: "MSG91 credentials not configured. Set MSG91_AUTH_KEY in Supabase secrets." }),
+        JSON.stringify({ error: "Twilio credentials not configured. Set TWILIO_ACCOUNT_SID in Supabase secrets." }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -89,58 +91,38 @@ serve(async (req: Request) => {
 
       try {
         const normalizedPhone = normalizePhoneNumber(phone);
-        // MSG91 expects number without leading + (e.g. 919876543210)
-        const mobile = normalizedPhone.replace(/^\+/, '');
 
-        const msg91Payload: any = {
-          sender: senderId,
-          route: "4",      // 4 = transactional
-          country: "91",
-          sms: [{ message: personalizedMessage, to: [mobile] }],
-        };
-        if (templateId) {
-          msg91Payload.DLT_TE_ID = templateId;
-        }
-        if (peId) {
-          msg91Payload.PE_ID = peId;
-        }
+        const twilioRes = await fetch(
+          `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: "Basic " + btoa(`${accountSid}:${authToken}`),
+              "Content-Type": "application/x-www-form-urlencoded",
+            },
+            body: new URLSearchParams({ To: normalizedPhone, From: fromSms, Body: personalizedMessage }),
+          }
+        );
 
-        const response = await fetch("https://api.msg91.com/api/v2/sendsms", {
-          method: "POST",
-          headers: {
-            "authkey": authKey,
-            "content-type": "application/json",
-          },
-          body: JSON.stringify(msg91Payload),
-        });
+        const data = await twilioRes.json();
+        console.log(`Twilio SMS response for ${normalizedPhone}:`, data);
 
-        const data = await response.json();
-        console.log(`MSG91 response for ${mobile}:`, data);
-
-        if (data.type === "success" || data.type === "Success") {
+        if (twilioRes.ok) {
           results.push({
             phone: normalizedPhone,
             originalPhone: phone,
             success: true,
-            delivered: false, // MSG91 doesn't confirm delivery immediately
-            status: "sent",
-            note: "Message accepted by MSG91 for delivery.",
+            delivered: true,
+            sid: data.sid,
+            status: data.status,
+            note: "Message sent via Twilio.",
           });
         } else {
-          const errorMsg = data.message || data.error || "MSG91 API error";
-          let friendlyError = errorMsg;
-
-          // MSG91 error codes
-          if (errorMsg.toLowerCase().includes("invalid mobile")) {
-            friendlyError = "Invalid mobile number format. Use Indian format (e.g. 919876543210).";
-          } else if (errorMsg.toLowerCase().includes("authkey")) {
-            friendlyError = "Invalid MSG91 Auth Key. Check your credentials.";
-          } else if (errorMsg.toLowerCase().includes("sender")) {
-            friendlyError = "Invalid or unapproved Sender ID for MSG91.";
-          } else if (errorMsg.toLowerCase().includes("balance") || errorMsg.toLowerCase().includes("credit")) {
-            friendlyError = "Insufficient MSG91 credits. Recharge your account.";
-          } else if (errorMsg.toLowerCase().includes("dnd")) {
-            friendlyError = "Number is on DND (Do Not Disturb) list. Cannot deliver.";
+          let friendlyError = data.message || "Twilio error";
+          if (data.code === 21608) {
+            friendlyError = "Cannot send to unverified number (Twilio trial). Verify caller ID in Twilio console.";
+          } else if (data.code === 21211) {
+            friendlyError = "Invalid phone number format. Use +91 format for India.";
           }
 
           results.push({
@@ -148,6 +130,7 @@ serve(async (req: Request) => {
             originalPhone: phone,
             success: false,
             error: friendlyError,
+            code: data.code,
           });
         }
       } catch (err: unknown) {
@@ -165,7 +148,7 @@ serve(async (req: Request) => {
         campaign_id: campaignIdToUse,
         phone: r.phone,
         success: r.success,
-        provider_sid: r.status || null,
+        provider_sid: r.sid || null,
         error_message: r.error || null,
       })));
     }
@@ -184,14 +167,3 @@ serve(async (req: Request) => {
     );
   }
 });
-
-function normalizePhoneNumber(phone: string): string {
-  let cleaned = phone.replace(/[^\d+]/g, '');
-  if (cleaned.startsWith('+')) return cleaned;
-  if (cleaned.startsWith('00')) return '+' + cleaned.substring(2);
-  if (cleaned.length === 10 && /^[6-9]\d{9}$/.test(cleaned)) return '+91' + cleaned;
-  if (cleaned.length === 10) return '+1' + cleaned;
-  if (cleaned.length === 11 && cleaned.startsWith('1')) return '+' + cleaned;
-  if (cleaned.length >= 11) return '+' + cleaned;
-  return '+' + cleaned;
-}
