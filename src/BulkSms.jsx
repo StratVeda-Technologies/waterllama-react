@@ -312,7 +312,7 @@ export default function BulkSms() {
           <div>
             <h2 className="sms-page-title">Compose Bulk Message</h2>
             <p className="sms-page-subtitle">
-              Send bulk SMS campaigns using Twilio API (+91 Indian numbers).
+              Send bulk messages via 📱 WhatsApp (free, wa.me) or 📲 Twilio SMS to Indian (+91) numbers.
             </p>
 
             <div className="sms-grid">
@@ -341,10 +341,32 @@ export default function BulkSms() {
                   <div className="sms-form-group">
                     <label>Channel</label>
                     <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'default' }}>
-                        <span>📲 Twilio SMS</span>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                        <input
+                          type="radio"
+                          name="messageType"
+                          value="sms"
+                          checked={messageType === 'sms'}
+                          onChange={() => setMessageType('sms')}
+                        />
+                        📲 Twilio SMS
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                        <input
+                          type="radio"
+                          name="messageType"
+                          value="whatsapp"
+                          checked={messageType === 'whatsapp'}
+                          onChange={() => setMessageType('whatsapp')}
+                        />
+                        📱 WhatsApp (wa.me — free)
                       </label>
                     </div>
+                    <p style={{ margin: '6px 0 0 0', fontSize: '0.78rem', color: 'var(--muted)' }}>
+                      {messageType === 'whatsapp'
+                        ? '💡 WhatsApp opens pre-filled chats via wa.me links — works without any backend'
+                        : '💡 SMS sent via Twilio — requires Supabase + Twilio secrets configured'}
+                    </p>
                   </div>
 
                   <div className="sms-form-group">

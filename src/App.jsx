@@ -786,16 +786,29 @@ function App() {
             <section className="reminder-panel">
               <p className="eyebrow">Auto-delivery engine</p>
               <h2>Smart hydration reminders every {reminderGap} hours.</h2>
-              <p>Reminders fire automatically via Twilio SMS. Enable them, add your +91 mobile number, and the app handles the rest.</p>
+              <p>Reminders fire automatically. Choose WhatsApp (free, via wa.me) or Twilio SMS. Enable them, add your +91 mobile number, and the app handles the rest.</p>
 
               <div className="method-toggle">
-                <button className="active" type="button">
+                <button
+                  className={notificationMethod === 'WhatsApp' ? 'active' : ''}
+                  type="button"
+                  onClick={() => setNotificationMethod('WhatsApp')}
+                >
+                  📱 WhatsApp
+                </button>
+                <button
+                  className={notificationMethod === 'SMS' ? 'active' : ''}
+                  type="button"
+                  onClick={() => setNotificationMethod('SMS')}
+                >
                   📲 Twilio SMS
                 </button>
-                <span className="method-note">
-                  💡 Powered by Twilio SMS Service
-                </span>
               </div>
+              <span className="method-note">
+                {notificationMethod === 'WhatsApp'
+                  ? '💡 WhatsApp opens a pre-filled chat via wa.me (free, no backend needed)'
+                  : '💡 SMS sent via Twilio — ensure Supabase secrets are configured'}
+              </span>
 
               <div className="section-heading">
                 <h2>Auto reminders</h2>
