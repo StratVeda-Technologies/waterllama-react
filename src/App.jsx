@@ -838,189 +838,155 @@ function App() {
 
         {activeTab === 'reminders' && (
           <div className="screen-grid">
-            <section className="reminder-panel">
-              <p className="eyebrow">Auto-delivery engine</p>
-              <h2>Smart hydration reminders every {reminderGap} hours.</h2>
-              <p>Reminders fire automatically. Choose WhatsApp (free, via wa.me) or Twilio SMS. Enable them, add your +91 mobile number, and the app handles the rest.</p>
-
-              <div className="method-toggle">
-                <button
-                  className={notificationMethod === 'WhatsApp' ? 'active' : ''}
-                  type="button"
-                  onClick={() => setNotificationMethod('WhatsApp')}
-                >
-                  📱 WhatsApp
-                </button>
-                <button
-                  className={notificationMethod === 'SMS' ? 'active' : ''}
-                  type="button"
-                  onClick={() => setNotificationMethod('SMS')}
-                >
-                  📲 Twilio SMS
-                </button>
+            <section className="reminder-panel" style={{ maxWidth: '600px', margin: '0 auto' }}>
+              <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+                <p className="eyebrow" style={{ justifyContent: 'center' }}>⚡ Auto-delivery engine</p>
+                <h2 style={{ fontSize: '1.75rem', fontWeight: 800, marginTop: '4px' }}>Hydration Reminders</h2>
+                <p style={{ color: 'var(--muted)', fontSize: '0.92rem', marginTop: '6px', maxWidth: '480px', marginInLine: 'auto' }}>
+                  Keep your hydration on track with automated reminders delivered via WhatsApp or SMS.
+                </p>
               </div>
-              <span className="method-note">
-                {notificationMethod === 'WhatsApp'
-                  ? '💡 WhatsApp opens a pre-filled chat via wa.me (free, no backend needed)'
-                  : '💡 SMS sent via Twilio — enter your Auth Token below'}
-              </span>
 
-              {notificationMethod === 'SMS' && (
-                <div style={{ marginTop: '14px', padding: '14px', background: 'var(--soft)', borderRadius: '12px', border: '1.5px solid var(--brand)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--brand-strong)' }}>⚡ Twilio Credentials</span>
-                    {twilioToken ? (
-                      <span style={{ fontSize: '0.75rem', color: '#16a34a', fontWeight: 700 }}>✅ Auth Token Saved</span>
-                    ) : (
-                      <span style={{ fontSize: '0.75rem', color: '#dc2626', fontWeight: 700 }}>⚠️ Auth Token Required</span>
-                    )}
-                  </div>
+              {/* ── Channel Selector Card ── */}
+              <div style={{ padding: '16px', background: 'var(--card)', borderRadius: '16px', border: '1px solid var(--line)', marginBottom: '20px', boxShadow: '0 4px 12px rgba(0,0,0,0.03)' }}>
+                <label style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text)', display: 'block', marginBottom: '10px' }}>
+                  Delivery Channel
+                </label>
+                <div className="method-toggle">
+                  <button
+                    className={notificationMethod === 'WhatsApp' ? 'active' : ''}
+                    type="button"
+                    onClick={() => setNotificationMethod('WhatsApp')}
+                  >
+                    📱 WhatsApp
+                  </button>
+                  <button
+                    className={notificationMethod === 'SMS' ? 'active' : ''}
+                    type="button"
+                    onClick={() => setNotificationMethod('SMS')}
+                  >
+                    📲 Twilio SMS
+                  </button>
+                </div>
+                <span className="method-note" style={{ marginTop: '10px', display: 'block', textAlign: 'center' }}>
+                  {notificationMethod === 'WhatsApp'
+                    ? '💡 Free wa.me links open WhatsApp with your custom reminder message'
+                    : '💡 Automated SMS messages sent directly to your phone via Twilio'}
+                </span>
+              </div>
+
+              {/* ── Auto Reminders Config Card ── */}
+              <div style={{ padding: '20px', background: 'var(--card)', borderRadius: '16px', border: '1px solid var(--line)', marginBottom: '20px', boxShadow: '0 4px 12px rgba(0,0,0,0.03)' }}>
+                <div className="section-heading" style={{ marginBottom: '16px' }}>
                   <div>
-                    <label style={{ fontSize: '0.75rem', fontWeight: 700, display: 'block', marginBottom: '3px' }}>Twilio Auth Token</label>
+                    <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700 }}>Auto Schedule</h3>
+                    <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: 'var(--muted)' }}>
+                      Automatically trigger reminders while the app is active
+                    </p>
+                  </div>
+                  <label className="switch">
                     <input
-                      type="password"
-                      placeholder="Paste your Auth Token from Twilio Console"
-                      value={twilioToken}
-                      onChange={e => {
-                        const val = e.target.value.trim()
-                        setTwilioToken(val)
-                        setTwilioConfig(twilioSid, val, twilioFrom)
-                      }}
-                      style={{
-                        width: '100%', padding: '8px 12px', borderRadius: '8px',
-                        border: '1px solid var(--line)', background: 'var(--card)',
-                        color: 'var(--text)', fontSize: '0.85rem', fontFamily: 'monospace'
+                      checked={remindersOn}
+                      type="checkbox"
+                      onChange={(event) => {
+                        const checked = event.target.checked
+                        setRemindersOn(checked)
+                        if (checked) {
+                          setLastAutoSent(new Date().toISOString())
+                        }
                       }}
                     />
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                    <div>
-                      <label style={{ fontSize: '0.75rem', fontWeight: 700, display: 'block', marginBottom: '3px' }}>Account SID</label>
-                      <input
-                        type="text"
-                        value={twilioSid}
-                        onChange={e => {
-                          const val = e.target.value.trim()
-                          setTwilioSid(val)
-                          setTwilioConfig(val, twilioToken, twilioFrom)
-                        }}
-                        style={{
-                          width: '100%', padding: '6px 10px', borderRadius: '6px',
-                          border: '1px solid var(--line)', background: 'var(--card)',
-                          color: 'var(--text)', fontSize: '0.8rem', fontFamily: 'monospace'
-                        }}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ fontSize: '0.75rem', fontWeight: 700, display: 'block', marginBottom: '3px' }}>From Number</label>
-                      <input
-                        type="text"
-                        value={twilioFrom}
-                        onChange={e => {
-                          const val = e.target.value.trim()
-                          setTwilioFrom(val)
-                          setTwilioConfig(twilioSid, twilioToken, val)
-                        }}
-                        style={{
-                          width: '100%', padding: '6px 10px', borderRadius: '6px',
-                          border: '1px solid var(--line)', background: 'var(--card)',
-                          color: 'var(--text)', fontSize: '0.8rem', fontFamily: 'monospace'
-                        }}
-                      />
-                    </div>
-                  </div>
-                  <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--muted)' }}>
-                    💡 Trial limitation: Recipients must be verified in Twilio Console → Verified Caller IDs
-                  </p>
+                    <span></span>
+                  </label>
                 </div>
-              )}
 
-              <div className="section-heading">
-                <h2>Auto reminders</h2>
-                <label className="switch">
-                  <input
-                    checked={remindersOn}
-                    type="checkbox"
-                    onChange={(event) => {
-                      const checked = event.target.checked
-                      setRemindersOn(checked)
-                      if (checked) {
-                        setLastAutoSent(new Date().toISOString())
-                      }
-                    }}
-                  />
-                  <span></span>
-                </label>
-              </div>
-              <div className="stepper">
-                <button type="button" onClick={() => {
-                  setReminderGap(Math.max(1, reminderGap - 1))
-                  setLastAutoSent(new Date().toISOString())
-                }}>-</button>
-                <strong>Every {reminderGap} hours</strong>
-                <button type="button" onClick={() => {
-                  setReminderGap(Math.min(8, reminderGap + 1))
-                  setLastAutoSent(new Date().toISOString())
-                }}>+</button>
-              </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: 'var(--soft)', borderRadius: '12px', marginBottom: '16px' }}>
+                  <span style={{ fontSize: '0.88rem', fontWeight: 600 }}>Reminder Frequency</span>
+                  <div className="stepper" style={{ margin: 0 }}>
+                    <button type="button" onClick={() => {
+                      setReminderGap(Math.max(1, reminderGap - 1))
+                      setLastAutoSent(new Date().toISOString())
+                    }}>-</button>
+                    <strong>Every {reminderGap} hrs</strong>
+                    <button type="button" onClick={() => {
+                      setReminderGap(Math.min(8, reminderGap + 1))
+                      setLastAutoSent(new Date().toISOString())
+                    }}>+</button>
+                  </div>
+                </div>
 
-              {/* ── Countdown + status row ── */}
-              <div className="reminder-status-row">
-                {remindersOn && cleanPhone ? (
-                  nextReminderIn !== null ? (
-                    <div className="reminder-countdown">
-                      <span className="countdown-pulse"></span>
-                      <span>Next auto-send in <strong>{formatCountdown(nextReminderIn)}</strong></span>
+                {/* ── Countdown + Status Row ── */}
+                <div className="reminder-status-row" style={{ margin: 0 }}>
+                  {remindersOn && cleanPhone ? (
+                    nextReminderIn !== null ? (
+                      <div className="reminder-countdown" style={{ width: '100%', justifyContent: 'center' }}>
+                        <span className="countdown-pulse"></span>
+                        <span>Next auto-send in <strong>{formatCountdown(nextReminderIn)}</strong></span>
+                      </div>
+                    ) : null
+                  ) : (
+                    <div className="reminder-inactive" style={{ width: '100%', textAlign: 'center' }}>
+                      {!cleanPhone
+                        ? '⚠ Add a phone number in Profile to enable auto-reminders'
+                        : '⏸ Auto reminders paused — toggle on above'}
                     </div>
-                  ) : null
-                ) : (
-                  <div className="reminder-inactive">
-                    {!cleanPhone
-                      ? '⚠ Add a phone number to enable auto-reminders'
-                      : '⏸ Auto reminders paused — toggle on above'}
-                  </div>
-                )}
-                {autoSendStatus === 'sending' && (
-                  <div className="send-chip send-chip--sending">
-                    <span className="chip-spinner"></span> Opening…
-                  </div>
-                )}
-                {autoSendStatus === 'sent' && (
-                  <div className="send-chip send-chip--sent">✓ Opened via {notificationMethod}</div>
-                )}
-                {autoSendStatus === 'error' && (
-                  <div className="send-chip send-chip--error" title={autoSendError}>
-                    ✗ Error — {autoSendError.slice(0, 48)}{autoSendError.length > 48 ? '…' : ''}
-                  </div>
+                  )}
+                  {autoSendStatus === 'sending' && (
+                    <div className="send-chip send-chip--sending" style={{ width: '100%', justifyContent: 'center' }}>
+                      <span className="chip-spinner"></span> Processing {notificationMethod} message…
+                    </div>
+                  )}
+                  {autoSendStatus === 'sent' && (
+                    <div className="send-chip send-chip--sent" style={{ width: '100%', justifyContent: 'center' }}>
+                      ✓ Message Sent via {notificationMethod}
+                    </div>
+                  )}
+                  {autoSendStatus === 'error' && (
+                    <div className="send-chip send-chip--error" title={autoSendError} style={{ width: '100%', justifyContent: 'center' }}>
+                      ✗ Error — {autoSendError.slice(0, 52)}{autoSendError.length > 52 ? '…' : ''}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* ── Message Preview Banner ── */}
+              <div className="reminder-preview" style={{ marginBottom: '20px', background: 'var(--card)', borderRadius: '16px', padding: '16px 20px', border: '1px solid var(--line)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <small style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--brand-strong)' }}>
+                    💬 {notificationMethod} Notification Preview
+                  </small>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>Browser: {browserPermission}</span>
+                </div>
+                <p style={{ fontSize: '0.95rem', lineHeight: 1.4, margin: '8px 0' }}>{reminderMessage}</p>
+                {lastReminder && (
+                  <span style={{ fontSize: '0.75rem', color: 'var(--muted)', display: 'block', marginTop: '6px' }}>
+                    🕒 Last sent: {lastReminder}
+                  </span>
                 )}
               </div>
 
-              <div className="reminder-preview">
-                <small>Message preview</small>
-                <p>{reminderMessage}</p>
-                <span>Browser permission: {browserPermission}</span>
-                {lastReminder && <span>Last sent at {lastReminder}</span>}
-              </div>
-
-              <div className="reminder-actions">
+              {/* ── Action Buttons ── */}
+              <div className="reminder-actions" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 <button
                   className="primary-action"
                   type="button"
+                  style={{ width: '100%', padding: '14px', fontSize: '1rem', fontWeight: 700, borderRadius: '12px' }}
                   disabled={autoSendStatus === 'sending' || !cleanPhone}
                   onClick={() => sendReminder()}
                 >
                   {autoSendStatus === 'sending'
                     ? `Sending ${notificationMethod}…`
                     : notificationMethod === 'SMS'
-                      ? `📲 Send SMS now`
-                      : `📱 Send WhatsApp now`}
+                      ? `📲 Send SMS Now`
+                      : `📱 Send WhatsApp Now`}
                 </button>
                 <button
                   className="secondary-action"
                   type="button"
+                  style={{ width: '100%', padding: '12px', borderRadius: '12px' }}
                   onClick={createBrowserReminder}
                 >
-                  {remindersOn ? 'Test browser notification' : 'Turn reminders on'}
+                  {remindersOn ? '🔔 Test Local Browser Notification' : 'Turn Reminders On'}
                 </button>
               </div>
             </section>
