@@ -956,20 +956,6 @@ function App() {
             </section>
 
             <section className="backend-panel">
-              <p className="eyebrow">Local mode (localStorage)</p>
-              <h2>Running in local mode</h2>
-              <p>All data is stored in your browser's localStorage. No database server required.</p>
-              <p>Works offline and on any device - just open the app!</p>
-
-              <div style={{ marginTop: '20px', padding: '16px', background: 'var(--soft)', borderRadius: '12px', border: '1px solid var(--line)' }}>
-                <strong>✅ Data persists locally</strong>
-                <ul style={{ margin: '8px 0 0 0', paddingLeft: '20px', fontSize: '0.9rem' }}>
-                  <li>Water intake logs</li>
-                  <li>User profile & settings</li>
-                  <li>Reminders & preferences</li>
-                  <li>Premium status</li>
-                </ul>
-              </div>
 
               <div style={{ marginTop: '16px', padding: '16px', background: 'var(--soft)', borderRadius: '12px', border: '1px solid var(--line)' }}>
                 <strong>📱 Reminder Channels</strong>
