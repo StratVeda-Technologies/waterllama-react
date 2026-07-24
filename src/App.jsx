@@ -862,8 +862,78 @@ function App() {
               <span className="method-note">
                 {notificationMethod === 'WhatsApp'
                   ? '💡 WhatsApp opens a pre-filled chat via wa.me (free, no backend needed)'
-                  : '💡 SMS sent via Twilio — ensure Supabase secrets are configured'}
+                  : '💡 SMS sent via Twilio — enter your Auth Token below'}
               </span>
+
+              {notificationMethod === 'SMS' && (
+                <div style={{ marginTop: '14px', padding: '14px', background: 'var(--soft)', borderRadius: '12px', border: '1.5px solid var(--brand)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--brand-strong)' }}>⚡ Twilio Credentials</span>
+                    {twilioToken ? (
+                      <span style={{ fontSize: '0.75rem', color: '#16a34a', fontWeight: 700 }}>✅ Auth Token Saved</span>
+                    ) : (
+                      <span style={{ fontSize: '0.75rem', color: '#dc2626', fontWeight: 700 }}>⚠️ Auth Token Required</span>
+                    )}
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 700, display: 'block', marginBottom: '3px' }}>Twilio Auth Token</label>
+                    <input
+                      type="password"
+                      placeholder="Paste your Auth Token from Twilio Console"
+                      value={twilioToken}
+                      onChange={e => {
+                        const val = e.target.value.trim()
+                        setTwilioToken(val)
+                        setTwilioConfig(twilioSid, val, twilioFrom)
+                      }}
+                      style={{
+                        width: '100%', padding: '8px 12px', borderRadius: '8px',
+                        border: '1px solid var(--line)', background: 'var(--card)',
+                        color: 'var(--text)', fontSize: '0.85rem', fontFamily: 'monospace'
+                      }}
+                    />
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                    <div>
+                      <label style={{ fontSize: '0.75rem', fontWeight: 700, display: 'block', marginBottom: '3px' }}>Account SID</label>
+                      <input
+                        type="text"
+                        value={twilioSid}
+                        onChange={e => {
+                          const val = e.target.value.trim()
+                          setTwilioSid(val)
+                          setTwilioConfig(val, twilioToken, twilioFrom)
+                        }}
+                        style={{
+                          width: '100%', padding: '6px 10px', borderRadius: '6px',
+                          border: '1px solid var(--line)', background: 'var(--card)',
+                          color: 'var(--text)', fontSize: '0.8rem', fontFamily: 'monospace'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '0.75rem', fontWeight: 700, display: 'block', marginBottom: '3px' }}>From Number</label>
+                      <input
+                        type="text"
+                        value={twilioFrom}
+                        onChange={e => {
+                          const val = e.target.value.trim()
+                          setTwilioFrom(val)
+                          setTwilioConfig(twilioSid, twilioToken, val)
+                        }}
+                        style={{
+                          width: '100%', padding: '6px 10px', borderRadius: '6px',
+                          border: '1px solid var(--line)', background: 'var(--card)',
+                          color: 'var(--text)', fontSize: '0.8rem', fontFamily: 'monospace'
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--muted)' }}>
+                    💡 Trial limitation: Recipients must be verified in Twilio Console → Verified Caller IDs
+                  </p>
+                </div>
+              )}
 
               <div className="section-heading">
                 <h2>Auto reminders</h2>
