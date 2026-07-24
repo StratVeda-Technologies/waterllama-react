@@ -36,11 +36,10 @@ function createTwilioClient() {
 const twilioClient = createTwilioClient();
 
 // ── MSG91 CONFIG ──────────────────────────────────────────────────
-const msg91AuthKey   = process.env.MSG91_AUTH_KEY    || '548199AF2QjGjmXu6a4ca37eP1';
+const msg91AuthKey   = process.env.MSG91_AUTH_KEY    || '';
 const msg91SenderId  = process.env.MSG91_SENDER_ID   || '8956455702';
 const msg91TemplateId = process.env.MSG91_TEMPLATE_ID || '';
-// DLT Principal Entity ID (PE ID) — registered with TRAI. Required alongside DLT_TE_ID.
-const msg91PeId      = process.env.MSG91_PE_ID       || '895645';
+const msg91PeId      = process.env.MSG91_PE_ID       || '';
 
 async function sendMsg91Sms(to, message, templateId, peId) {
   let mobile = to.replace(/[^\d]/g, '');

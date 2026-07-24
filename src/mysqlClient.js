@@ -14,20 +14,18 @@ export const dbReady = false;
 let SUPABASE_URL = import.meta.env?.VITE_SUPABASE_URL || localStorage.getItem('supabase_url') || '';
 let SUPABASE_ANON_KEY = import.meta.env?.VITE_SUPABASE_ANON_KEY || import.meta.env?.VITE_SUPABASE_PUBLISHABLE_KEY || localStorage.getItem('supabase_anon_key') || localStorage.getItem('supabase_publishable_key') || '';
 
-// MSG91 credentials for SMS — baked into build from VITE_MSG91_* env vars.
-// Passed to edge functions so SMS works from any device without Supabase secrets.
-const MSG91_AUTH_KEY  = import.meta.env?.VITE_MSG91_AUTH_KEY   || '548199AF2QjGjmXu6a4ca37eP1';
+// MSG91 credentials for SMS — read from VITE_MSG91_* env vars or localStorage.
+const MSG91_AUTH_KEY  = import.meta.env?.VITE_MSG91_AUTH_KEY || localStorage.getItem('msg91_auth_key') || '';
 let MSG91_SENDER_ID = import.meta.env?.VITE_MSG91_SENDER_ID  || localStorage.getItem('msg91_sender_id') || '8956455702';
 // DLT Template ID — required by TRAI for SMS delivery in India.
-// Without a valid template_id, telecom operators block delivery even if MSG91 returns success.
-let MSG91_TEMPLATE_ID = import.meta.env?.VITE_MSG91_TEMPLATE_ID || localStorage.getItem('msg91_template_id') || '6a4cd3daab456645950e0bb2';
+let MSG91_TEMPLATE_ID = import.meta.env?.VITE_MSG91_TEMPLATE_ID || localStorage.getItem('msg91_template_id') || '';
 // DLT Entity ID (Principal Entity / PE ID) — required by TRAI.
-let MSG91_PE_ID = import.meta.env?.VITE_MSG91_PE_ID || localStorage.getItem('msg91_pe_id') || '895645';
+let MSG91_PE_ID = import.meta.env?.VITE_MSG91_PE_ID || localStorage.getItem('msg91_pe_id') || '';
 
-// Twilio credentials — used for SMS
-const TWILIO_SID   = import.meta.env?.VITE_TWILIO_ACCOUNT_SID  || localStorage.getItem('twilio_sid') || 'ACa9a843c3410a82db219187d42f0cc36e';
-const TWILIO_TOKEN = import.meta.env?.VITE_TWILIO_AUTH_TOKEN    || localStorage.getItem('twilio_token') || '687f42097751565d4847897e3b737ee5';
-const TWILIO_FROM  = import.meta.env?.VITE_TWILIO_PHONE_NUMBER  || localStorage.getItem('twilio_from') || '+16187536219';
+// Twilio credentials — read strictly from env vars or localStorage (never hardcoded in source)
+const TWILIO_SID   = import.meta.env?.VITE_TWILIO_ACCOUNT_SID  || localStorage.getItem('twilio_sid') || '';
+const TWILIO_TOKEN = import.meta.env?.VITE_TWILIO_AUTH_TOKEN    || localStorage.getItem('twilio_token') || '';
+const TWILIO_FROM  = import.meta.env?.VITE_TWILIO_PHONE_NUMBER  || localStorage.getItem('twilio_from') || '';
 
 // Helper: returns Twilio payload fields for SMS edge functions
 function twilioFallback() {
